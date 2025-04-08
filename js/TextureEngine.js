@@ -214,6 +214,7 @@ loadTextureOrNull(url) {
       return this.getTextures();
     }
   }
+  createFallbackTexture(){}
   
   /**
    * Create fallback texture with noise
