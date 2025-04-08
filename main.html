@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ancient Greek Musical Journey - The Agora</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="loading-screen">
+    <div id="loading-title">ENTERING THE ANCIENT WORLD</div>
+    <div id="loading-bar-container">
+      <div id="loading-bar"></div>
+    </div>
+    <div id="loading-text">Loading environment...</div>
+  </div>
+  
+  <canvas id="canvas"></canvas>
+  <div class="crosshair"></div>
+  <div class="interaction-notification" id="interaction-notification"></div>
+  
+  <div class="quest-log" id="quest-log">
+    <h3>Current Quest</h3>
+    <p><strong>The Musical Heritage</strong></p>
+    <p>Find the Temple of Apollo where the ancient instruments are kept. The temple keeper
+    awaits your arrival to show you the instruments of the gods.</p>
+    <p><strong>Hint:</strong> Look for a large white marble building with gold accents near the
+    center of the agora.</p>
+  </div>
+  
+  <div class="controls-hint">
+    <p><span>W, A, S, D</span> - Move</p>
+    <p><span>Mouse</span> - Look around</p>
+    <p><span>E</span> - Interact</p>
+    <p><span>Tab</span> - Quest log</p>
+    <p><span>ESC</span> - Menu</p>
+  </div>
+  
+  <div class="dialog-box" id="dialog-box">
+    <h3 id="dialog-speaker">Speaker</h3>
+    <p id="dialog-text">Text content goes here.</p>
+    <div class="dialog-continue">Click to continue...</div>
+  </div>
+  
+  <!-- Three.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <!-- Engine Core -->
+  <script src="js/config.js"></script>
+  <script src="js/TextureEngine.js"></script>
+  <script src="js/LoadingManager.js"></script>
+  
+  <!-- Game Objects -->
+  <script src="js/environment/SkyboxManager.js"></script>
+  <script src="js/environment/GroundManager.js"></script>
+  <script src="js/environment/LightingManager.js"></script>
+  <script src="js/environment/AtmosphericEffects.js"></script>
+  
+  <!-- Building Components -->
+  <script src="js/buildings/TemplesManager.js"></script>
+  <script src="js/buildings/BuildingsManager.js"></script>
+  <script src="js/buildings/StructuresManager.js"></script>
+  <script src="js/buildings/DecorationsManager.js"></script>
+  
+  <!-- Interaction System -->
+  <script src="js/interaction/PlayerController.js"></script>
+  <script src="js/interaction/CollisionManager.js"></script>
+  <script src="js/interaction/QuestManager.js"></script>
+  <script src="js/interaction/DialogManager.js"></script>
+  
+  <!-- Musical Instruments -->
+  <script src="js/instruments/StringedManager.js"></script>
+  <script src="js/instruments/WindManager.js"></script>
+  <script src="js/instruments/PercussionManager.js"></script>
+  
+  <!-- Main Game -->
+  <script src="js/Game.js"></script>
+</body>
+</html>

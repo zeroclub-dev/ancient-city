@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ancient Greek Musical Journey - Main Menu</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Cinzel', serif;
+        }
+
+        @font-face {
+            font-family: 'GrecianFont';
+            src: url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
+        }
+
+        body {
+            overflow: hidden;
+            background: #000;
+            color: #d4af37;
+        }
+
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        .menu-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .title {
+            font-size: 5rem;
+            margin-bottom: 2rem;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.7), 0 0 20px rgba(255, 215, 0, 0.5);
+            color: #f5f5dc;
+            text-align: center;
+            letter-spacing: 0.2rem;
+            opacity: 0;
+            transform: translateY(-50px);
+            animation: fadeIn 1.5s ease-out forwards;
+        }
+
+        .subtitle {
+            font-size: 2rem;
+            margin-bottom: 4rem;
+            color: #e0d2b4;
+            text-shadow: 0 0 10px rgba(224, 210, 180, 0.7);
+            opacity: 0;
+            transform: translateY(-30px);
+            animation: fadeIn 1.5s ease-out 0.5s forwards;
+        }
+
+        .start-button {
+            padding: 1.5rem 3rem;
+            background: linear-gradient(135deg, #906c2a, #d4af37, #f9e076, #d4af37, #906c2a);
+            border: 2px solid #f5f5dc;
+            border-radius: 5px;
+            color: #1a1a1a;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+            pointer-events: auto;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeIn 1.5s ease-out 1s forwards;
+        }
+
+        .start-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.8);
+        }
+
+        .start-button:active {
+            transform: scale(0.98);
+        }
+
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 1;
+            transition: opacity 1s ease-out;
+        }
+
+        .loader {
+            width: 100px;
+            height: 100px;
+            border: 5px solid #333;
+            border-top: 5px solid #d4af37;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .credits {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: #a89566;
+            font-size: 0.9rem;
+            opacity: 0;
+            animation: fadeIn 1.5s ease-out 1.5s forwards;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .particles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .custom-cursor {
+            width: 30px;
+            height: 30px;
+            border: 2px solid #d4af37;
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: width 0.2s, height 0.2s;
+            display: none;
+        }
+
+        .flare {
+            position: absolute;
+            pointer-events: none;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 70%);
+            z-index: 2;
+        }
+    </style>
+</head>
+<body>
+    <div class="custom-cursor"></div>
+
+    <div class="loading-screen">
+        <div class="loader"></div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <div class="menu-container">
+        <h1 class="title">ANCIENT HARMONY</h1>
+        <h2 class="subtitle">A Journey Through Greek Musical Heritage</h2>
+        <button class="start-button" id="startButton">ENTER THE AGORA</button>
+    </div>
+
+    <div class="credits">Created by Ancient Harmony Studios - 2025</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+    <script>
+        // Custom cursor
+        const customCursor = document.querySelector('.custom-cursor');
+        
+        document.addEventListener('mousemove', (e) => {
+            customCursor.style.display = 'block';
+            customCursor.style.left = e.clientX + 'px';
+            customCursor.style.top = e.clientY + 'px';
+        });
+
+        document.addEventListener('mousedown', () => {
+            customCursor.style.width = '25px';
+            customCursor.style.height = '25px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            customCursor.style.width = '30px';
+            customCursor.style.height = '30px';
+        });
+
+        // Light flare effect
+        function createFlare(x, y) {
+            const flare = document.createElement('div');
+            flare.className = 'flare';
+            
+            const size = Math.random() * 100 + 50;
+            flare.style.width = size + 'px';
+            flare.style.height = size + 'px';
+            flare.style.left = (x - size/2) + 'px';
+            flare.style.top = (y - size/2) + 'px';
+            flare.style.opacity = Math.random() * 0.3 + 0.1;
+            
+            document.body.appendChild(flare);
+            
+            setTimeout(() => {
+                flare.style.opacity = '0';
+                setTimeout(() => {
+                    document.body.removeChild(flare);
+                }, 500);
+            }, 100);
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (Math.random() < 0.1) {
+                createFlare(e.clientX, e.clientY);
+            }
+        });
+
+        // Three.js scene setup
+        let scene, camera, renderer, clock;
+        let lyreModel, columnGroup, particles, skybox;
+        let targetRotationY = 0;
+        let lightIntensity = 0;
+        
+        const startButton = document.getElementById('startButton');
+        const loadingScreen = document.querySelector('.loading-screen');
+        
+        init();
+        animate();
+        
+        function init() {
+            // Create scene
+            scene = new THREE.Scene();
+            
+            // Setup camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+            camera.position.set(0, 1.5, 5);
+            
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ 
+                canvas: document.getElementById('canvas'),
+                antialias: true,
+                alpha: true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+            
+            const dirLight = new THREE.DirectionalLight(0xffeedd, 0.8);
+            dirLight.position.set(-3, 10, -10);
+            dirLight.castShadow = true;
+            dirLight.shadow.camera.top = 10;
+            dirLight.shadow.camera.right = 10;
+            dirLight.shadow.camera.bottom = -10;
+            dirLight.shadow.camera.left = -10;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+            
+            // Golden spotlight following mouse
+            const spotLight = new THREE.SpotLight(0xd4af37, 0.7, 25, Math.PI / 8, 0.5, 2);
+            spotLight.position.set(0, 15, 0);
+            scene.add(spotLight);
+            
+            // Mouse movement handler
+            document.addEventListener('mousemove', (event) => {
+                const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+                const mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                spotLight.position.x = mouseX * 8;
+                spotLight.position.z = mouseY * 5;
+                
+                targetRotationY = mouseX * 0.2;
+            });
+            
+            // Create skybox
+            createSkybox();
+            
+            // Add columns
+            createColumns();
+            
+            // Create lyre model
+            createLyre();
+            
+            // Create particle system
+            createParticles();
+            
+            // Setup clock for animations
+            clock = new THREE.Clock();
+            
+            // Initialize loading effect
+            setTimeout(() => {
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 1000);
+            }, 2000);
+            
+            // Start button event
+            startButton.addEventListener('click', () => {
+                // Transition effect
+                document.body.style.animation = 'fadeOut 1s forwards';
+                
+                // Navigate to main scene
+                setTimeout(() => {
+                    window.location.href = 'main.html';
+                }, 1000);
+            });
+            
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize);
+        }
+        
+        function createSkybox() {
+            const skyGeometry = new THREE.SphereGeometry(1000, 32, 32);
+            
+            // Create gradient texture for sky
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 1024;
+            const context = canvas.getContext('2d');
+            
+            const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#080b24'); // Deep night sky at top
+            gradient.addColorStop(0.4, '#193359'); // Dark blue
+            gradient.addColorStop(0.7, '#526192'); // Blue-purple
+            gradient.addColorStop(1, '#8ab4cd'); // Light blue at horizon
+            
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add stars
+            for (let i = 0; i < 2000; i++) {
+                const size = Math.random() * 2 + 1;
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height * 0.7; // Stars only in top 70%
+                
+                context.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.8 + 0.2})`;
+                context.beginPath();
+                context.arc(x, y, size / 2, 0, Math.PI * 2);
+                context.fill();
+            }
+            
+            // Create texture from canvas
+            const skyTexture = new THREE.CanvasTexture(canvas);
+            const skyMaterial = new THREE.MeshBasicMaterial({ 
+                map: skyTexture, 
+                side: THREE.BackSide 
+            });
+            
+            skybox = new THREE.Mesh(skyGeometry, skyMaterial);
+            scene.add(skybox);
+        }
+        
+        function createColumns() {
+            columnGroup = new THREE.Group();
+            
+            // Create a Greek column
+            function createColumn(x, z) {
+                const columnGroup = new THREE.Group();
+                
+                // Base
+                const baseGeometry = new THREE.CylinderGeometry(0.8, 0.8, 0.3, 32);
+                const baseMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0xd4d4d4, 
+                    specular: 0x555555,
+                    shininess: 30
+                });
+                const base = new THREE.Mesh(baseGeometry, baseMaterial);
+                columnGroup.add(base);
+                
+                // Shaft
+                const shaftGeometry = new THREE.CylinderGeometry(0.6, 0.7, 4, 32, 6, true);
+                const shaftMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0xeeeeee,
+                    specular: 0x999999,
+                    shininess: 30 
+                });
+                
+                // Add fluting to the column
+                const shaftPositions = shaftGeometry.attributes.position;
+                const flutingDepth = 0.05;
+                const flutingCount = 24;
+                
+                for (let i = 0; i < shaftPositions.count; i++) {
+                    const x = shaftPositions.getX(i);
+                    const y = shaftPositions.getY(i);
+                    const z = shaftPositions.getZ(i);
+                    
+                    if (y > -2 && y < 2) { // Only apply fluting to the central part
+                        const angle = Math.atan2(z, x);
+                        const radius = Math.sqrt(x * x + z * z);
+                        const flutingAngle = (angle + Math.PI) % (Math.PI * 2 / flutingCount);
+                        const flutingOffset = Math.sin(flutingAngle * flutingCount) * flutingDepth;
+                        const newRadius = radius - flutingOffset;
+                        
+                        shaftPositions.setX(i, newRadius * Math.cos(angle));
+                        shaftPositions.setZ(i, newRadius * Math.sin(angle));
+                    }
+                }
+                
+                const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
+                shaft.position.y = 2;
+                columnGroup.add(shaft);
+                
+                // Capital
+                const capitalGeometry = new THREE.CylinderGeometry(0.9, 0.6, 0.4, 32);
+                const capitalMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0xdddddd,
+                    specular: 0x555555,
+                    shininess: 30
+                });
+                const capital = new THREE.Mesh(capitalGeometry, capitalMaterial);
+                capital.position.y = 4.2;
+                columnGroup.add(capital);
+                
+                // Top abacus
+                const abacusGeometry = new THREE.BoxGeometry(1.8, 0.3, 1.8);
+                const abacusMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0xd4d4d4,
+                    specular: 0x555555,
+                    shininess: 30
+                });
+                const abacus = new THREE.Mesh(abacusGeometry, abacusMaterial);
+                abacus.position.y = 4.6;
+                columnGroup.add(abacus);
+                
+                // Set column position
+                columnGroup.position.set(x, 0, z);
+                columnGroup.castShadow = true;
+                columnGroup.receiveShadow = true;
+                
+                return columnGroup;
+            }
+            
+            // Create circle of columns
+            const columnCount = 12;
+            const radius = 15;
+            
+            for (let i = 0; i < columnCount; i++) {
+                const angle = (i / columnCount) * Math.PI * 2;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                
+                const column = createColumn(x, z);
+                // Add slight random rotation for realism
+                column.rotation.y = Math.random() * 0.2 - 0.1;
+                columnGroup.add(column);
+            }
+            
+            // Add floor
+            const floorGeometry = new THREE.CircleGeometry(20, 64);
+            const floorMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xd0ccc0,
+                specular: 0x222222,
+                shininess: 10
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -0.1;
+            floor.receiveShadow = true;
+            columnGroup.add(floor);
+            
+            // Add marble floor texture
+            const marbleSize = 40;
+            const marbleCanvas = document.createElement('canvas');
+            marbleCanvas.width = marbleSize;
+            marbleCanvas.height = marbleSize;
+            const marbleContext = marbleCanvas.getContext('2d');
+            
+            // Draw marble texture
+            marbleContext.fillStyle = '#d0ccc0';
+            marbleContext.fillRect(0, 0, marbleSize, marbleSize);
+            
+            // Add veins
+            marbleContext.strokeStyle = '#b5b2a8';
+            marbleContext.lineWidth = 0.5;
+            
+            for (let i = 0; i < 20; i++) {
+                marbleContext.beginPath();
+                const startX = Math.random() * marbleSize;
+                const startY = Math.random() * marbleSize;
+                marbleContext.moveTo(startX, startY);
+                
+                const points = Math.floor(Math.random() * 5) + 2;
+                for (let j = 0; j < points; j++) {
+                    const controlX1 = startX + Math.random() * 20 - 10;
+                    const controlY1 = startY + Math.random() * 20 - 10;
+                    const controlX2 = startX + Math.random() * 20 - 10;
+                    const controlY2 = startY + Math.random() * 20 - 10;
+                    const endX = startX + Math.random() * 20 - 10;
+                    const endY = startY + Math.random() * 20 - 10;
+                    
+                    marbleContext.bezierCurveTo(controlX1, controlY1, controlX2, controlY2, endX, endY);
+                }
+                
+                marbleContext.stroke();
+            }
+            
+            const floorTexture = new THREE.CanvasTexture(marbleCanvas);
+            floorTexture.wrapS = THREE.RepeatWrapping;
+            floorTexture.wrapT = THREE.RepeatWrapping;
+            floorTexture.repeat.set(20, 20);
+            floor.material.map = floorTexture;
+            floor.material.needsUpdate = true;
+            
+            scene.add(columnGroup);
+        }
+        
+        function createLyre() {
+            // Create lyre group
+            const lyreGroup = new THREE.Group();
+            
+            // Create the central resonator body (tortoise shell shape)
+            const bodyGeometry = new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+            const bodyMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x8b4513, 
+                specular: 0x333333,
+                shininess: 30
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.scale.set(1, 0.6, 1.2);
+            body.rotation.x = Math.PI / 2;
+            lyreGroup.add(body);
+            
+            // Create top cover (soundboard)
+            const coverGeometry = new THREE.CircleGeometry(1, 32, 0, Math.PI);
+            const coverMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xeeddcc, 
+                specular: 0x222222,
+                shininess: 20
+            });
+            const cover = new THREE.Mesh(coverGeometry, coverMaterial);
+            cover.position.z = 0.05;
+            cover.rotation.x = -Math.PI / 2;
+            lyreGroup.add(cover);
+            
+            // Create arms (curved horns)
+            function createArm(side) {
+                const armGroup = new THREE.Group();
+                
+                // Create curved path for the arm
+                const curve = new THREE.CubicBezierCurve3(
+                    new THREE.Vector3(side * 0.9, 0, 0),
+                    new THREE.Vector3(side * 1.1, 1, 0),
+                    new THREE.Vector3(side * 0.8, 2, 0),
+                    new THREE.Vector3(side * 0.4, 2.2, 0)
+                );
+                
+                const points = curve.getPoints(20);
+                const armGeometry = new THREE.TubeGeometry(
+                    new THREE.CatmullRomCurve3(points),
+                    64,
+                    0.08,
+                    16,
+                    false
+                );
+                
+                const armMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0xd2b48c,
+                    specular: 0x222222,
+                    shininess: 30
+                });
+                
+                const arm = new THREE.Mesh(armGeometry, armMaterial);
+                armGroup.add(arm);
+                
+                return armGroup;
+            }
+            
+            // Add left and right arms
+            const leftArm = createArm(-1);
+            const rightArm = createArm(1);
+            lyreGroup.add(leftArm);
+            lyreGroup.add(rightArm);
+            
+            // Create crossbar
+            const crossbarGeometry = new THREE.CylinderGeometry(0.06, 0.06, 1, 16);
+            const crossbarMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x8b4513,
+                specular: 0x222222,
+                shininess: 30
+            });
+            const crossbar = new THREE.Mesh(crossbarGeometry, crossbarMaterial);
+            crossbar.position.y = 2.2;
+            crossbar.rotation.z = Math.PI / 2;
+            lyreGroup.add(crossbar);
+            
+            // Create strings
+            const stringMaterial = new THREE.LineBasicMaterial({ 
+                color: 0xf5f5dc,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const stringCount = 7;
+            for (let i = 0; i < stringCount; i++) {
+                const x = -0.8 + (i * 1.6 / (stringCount - 1));
+                
+                const stringGeometry = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(x, 2.2, 0),
+                    new THREE.Vector3(x, 0, 0.1)
+                ]);
+                
+                const string = new THREE.Line(stringGeometry, stringMaterial);
+                lyreGroup.add(string);
+            }
+            
+            // Position and add the lyre
+            lyreGroup.scale.set(0.8, 0.8, 0.8);
+            lyreGroup.position.set(0, 1.2, 0);
+            lyreGroup.rotation.x = -0.2;
+            
+            // Add golden shimmer effect
+            const lyreGlow = new THREE.PointLight(0xd4af37, 0.5, 3);
+            lyreGlow.position.set(0, 1.5, 0);
+            lyreGroup.add(lyreGlow);
+            
+            // Store reference for animation
+            lyreModel = lyreGroup;
+            scene.add(lyreModel);
+        }
+        
+        function createParticles() {
+            const particleCount = 3000;
+            const particleGeometry = new THREE.BufferGeometry();
+            const particlePositions = new Float32Array(particleCount * 3);
+            const particleSizes = new Float32Array(particleCount);
+            
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                // Position particles in a sphere
+                const radius = 20;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos((Math.random() * 2) - 1);
+                
+                particlePositions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+                particlePositions[i3 + 1] = (radius * Math.sin(phi) * Math.sin(theta)) - 5; // Slightly lower
+                particlePositions[i3 + 2] = radius * Math.cos(phi);
+                
+                particleSizes[i] = Math.random() * 2 + 1;
+            }
+            
+            particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+            particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
+            
+            // Create gradient texture for particles
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const context = canvas.getContext('2d');
+            
+            const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.3, 'rgba(255, 240, 180, 0.8)');
+            gradient.addColorStop(1, 'rgba(255, 210, 120, 0)');
+            
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, 32, 32);
+            
+            const particleTexture = new THREE.CanvasTexture(canvas);
+            
+            const particleMaterial = new THREE.PointsMaterial({
+                size: 0.5,
+                map: particleTexture,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                vertexColors: false,
+                sizeAttenuation: true
+            });
+            
+            particles = new THREE.Points(particleGeometry, particleMaterial);
+            scene.add(particles);
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const delta = clock.getDelta();
+            const elapsed = clock.getElapsedTime();
+            
+            // Animate lyre rotation
+            if (lyreModel) {
+                // Smooth rotation towards target
+                lyreModel.rotation.y += (targetRotationY - lyreModel.rotation.y) * 0.05;
+                
+                // Gentle hovering animation
+                lyreModel.position.y = 1.2 + Math.sin(elapsed * 0.8) * 0.1;
+                
+                // Pulse the golden glow
+                if (lyreModel.children[lyreModel.children.length - 1].isLight) {
+                    // Pulsing glow intensity
+                    const light = lyreModel.children[lyreModel.children.length - 1];
+                    light.intensity = 0.5 + Math.sin(elapsed * 2) * 0.3;
+                }
+            }
+            
+            // Animate particles
+            if (particles) {
+                const positions = particles.geometry.attributes.position.array;
+                const sizes = particles.geometry.attributes.size.array;
+                
+                for (let i = 0; i < sizes.length; i++) {
+                    // Oscillate particle size
+                    sizes[i] = (Math.sin(elapsed + i) * 0.5 + 1.5) * (Math.random() * 0.2 + 0.8);
+                    
+                    // Slow circular motion
+                    const i3 = i * 3;
+                    const x = positions[i3];
+                    const z = positions[i3 + 2];
+                    const r = Math.sqrt(x * x + z * z);
+                    const theta = Math.atan2(z, x) + delta * 0.05;
+                    
+                    positions[i3] = r * Math.cos(theta);
+                    positions[i3 + 2] = r * Math.sin(theta);
+                }
+                
+                particles.geometry.attributes.position.needsUpdate = true;
+                particles.geometry.attributes.size.needsUpdate = true;
+                
+                // Rotate particle system
+                particles.rotation.y += delta * 0.02;
+            }
+            
+            // Render scene
+            renderer.render(scene, camera);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
