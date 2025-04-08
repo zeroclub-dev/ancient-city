@@ -22,7 +22,8 @@ class Game {
     this.playerController = null;
     this.dialogManager = null;
     this.questManager = null;
-    
+    this.musicManager = null;
+
     // Building systems
     this.templesManager = null;
     this.buildingsManager = null;
