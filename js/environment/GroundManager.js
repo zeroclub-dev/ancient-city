@@ -13,7 +13,7 @@ class GroundManager {
   
   createGround() {
   // Create terrain geometry
-  const groundGeometry = new THREE.PlaneGeometry(500, 500, 2, 2);
+  const groundGeometry = new THREE.PlaneGeometry(500, 500, 1, 1);
   groundGeometry.rotateX(-Math.PI / 2);
   
   // Create height variations
@@ -27,6 +27,7 @@ class GroundManager {
     let height = 0;
     
     if (distFromCenter > 50) {
+
       // Perlin-like noise for rolling hills outside city
       height = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 2;
       height += Math.sin(x * 0.01 + z * 0.01) * 3;
