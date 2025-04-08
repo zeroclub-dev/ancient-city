@@ -77,6 +77,8 @@ this.textureEngine = new TextureEngine(this.renderer, this.scene, this.loadingMa
 // Load textures first
 await this.textureEngine.loadAllTextures();
 
+this.musicManager = new MusicManager();
+
 // Create core environment managers
 this.skyboxManager = new SkyboxManager(this.scene, this.textureEngine);
 
