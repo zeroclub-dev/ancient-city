@@ -13,7 +13,7 @@ class GroundManager {
   
   createGround() {
   // Create terrain geometry
-  const groundGeometry = new THREE.PlaneGeometry(500, 500, 1, 1);
+  const groundGeometry = new THREE.PlaneGeometry(500, 500, 2, 2);
   groundGeometry.rotateX(-Math.PI / 2);
   
   // Create height variations

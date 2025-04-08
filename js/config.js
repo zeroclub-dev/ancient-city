@@ -25,7 +25,7 @@ const CONFIG = {
       metal: 'Metal032',
       rock: 'Rock023',
       roof: 'Roofingtiles002',
-      tiles: 'Tiles074',
+      tiles: 'PavingStones147',
       wood: 'Wood062'
     }
   },
