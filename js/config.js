@@ -34,7 +34,7 @@ const CONFIG = {
   camera: {
     fov: 75,
     near: 0.1,
-    far: 1000,
+    far: 250,
     height: 1.6,         // Height of camera (eye level)
     headBobAmount: 0.05  // Amount of head bobbing when walking
   },
