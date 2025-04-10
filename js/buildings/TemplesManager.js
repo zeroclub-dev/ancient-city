@@ -1,6 +1,7 @@
 /**
  * TemplesManager
  * Handles creation and management of the floating temple structure
+ * with improved stair access
  */
 class TemplesManager {
   constructor(scene, textureEngine, collisionManager, playerController, questManager, dialogManager) {
@@ -26,11 +27,16 @@ class TemplesManager {
     // Get textures from texture engine
     const { marbleTexture, goldTexture, roofTileTexture, stoneTexture } = this.textureEngine.getTextures();
     
+    // Position the entire temple complex
+    const templeX = -40;
+    const templeY = 20; // Lower height for better accessibility
+    const templeZ = -10;
+    
     // Create floating island
     this.createFloatingIsland(stoneTexture);
     
-    // Create floating staircase
-    this.createFloatingStaircase(marbleTexture);
+    // Create accessible staircase
+    this.createAccessibleStaircase(marbleTexture, templeX, templeY, templeZ);
     
     // Create temple on the island
     this.createTempleStructure(marbleTexture, goldTexture, roofTileTexture);
@@ -38,11 +44,6 @@ class TemplesManager {
     // Create lighting and atmosphere
     this.addTempleLighting();
     this.addAtmosphericEffects();
-    
-    // Position the entire temple complex
-    const templeX = -40;
-    const templeY = 40; // Floating high in the air
-    const templeZ = -10;
     
     this.templeGroup.position.set(templeX, templeY, templeZ);
     this.scene.add(this.templeGroup);
@@ -52,6 +53,9 @@ class TemplesManager {
     
     // Add visual quest marker
     this.questManager.createQuestMarker(new THREE.Vector3(templeX, templeY + 15, templeZ - 6));
+    
+    // Create starting teleporter for easier access
+    this.createGroundTeleporter(templeX, templeZ);
     
     return this.templeGroup;
   }
@@ -129,7 +133,7 @@ class TemplesManager {
     
     // Add collision for the island surface
     this.collisionManager.addCollider({
-      position: new THREE.Vector3(0, 0, 0),
+      position: new THREE.Vector3(this.templeGroup.position.x, this.templeGroup.position.y, this.templeGroup.position.z),
       radius: islandRadius,
       type: 'cylinder',
       height: 0.2
@@ -250,17 +254,24 @@ class TemplesManager {
     }
   }
   
-  createFloatingStaircase(marbleTexture) {
-    // Create a series of floating steps leading up to the island
-    const startY = -30; // Starting point below the island
-    const endY = 0;     // End at island surface
-    const startZ = 50;  // Start far from the island
-    const endZ = 20;    // End at the edge of the island
+  createAccessibleStaircase(marbleTexture, templeX, templeY, templeZ) {
+    // Create a solid, accessible staircase leading up to the island
+    const startY = 0; // Start at ground level
+    const endY = templeY; // End at temple height
     
-    const stepCount = 15;
-    const stepWidth = 6;
-    const stepDepth = 3;
-    const stepHeight = 0.5;
+    // The staircase will start at ground level below the temple
+    const startPoint = new THREE.Vector3(0, 0, 40); // Starting point on the ground
+    const endPoint = new THREE.Vector3(0, 0, 15);   // End point near the island's edge
+    
+    // Calculate stair parameters
+    const horizontalDistance = startPoint.z - endPoint.z;
+    const verticalDistance = endY;
+    const stepCount = 40; // More steps for easier climbing
+    
+    // Calculate dimensions for each step
+    const stepDepth = horizontalDistance / stepCount;
+    const stepHeight = verticalDistance / stepCount;
+    const stepWidth = 6; // Width of each step
     
     const stepMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
@@ -268,31 +279,17 @@ class TemplesManager {
       roughness: 0.5,
       metalness: 0.1
     });
-    
+
+    // Create individual steps
     for (let i = 0; i < stepCount; i++) {
-      // Calculate step position based on curve
-      const t = i / (stepCount - 1);
-      const y = startY + (endY - startY) * t;
-      const z = startZ - (startZ - endZ) * (t * t); // Quadratic curve for nicer approach
-      
-      // Make steps get closer together as they ascend
-      const stepSpacing = 1 - (0.5 * t);
-      
-      // Create step geometry and offset initial steps for curved approach
-      const stepGeometry = new THREE.BoxGeometry(
-        stepWidth - (t * 2), // Steps get narrower as they approach the island
-        stepHeight,
-        stepDepth
-      );
-      
+      const stepGeometry = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth);
       const step = new THREE.Mesh(stepGeometry, stepMaterial);
       
-      // Position step with slight rotation for curved approach
-      step.position.set(0, y + i * stepSpacing, z);
+      // Position each step along the path from start to end
+      const z = startPoint.z - (i * stepDepth) - (stepDepth / 2);
+      const y = (i * stepHeight) + (stepHeight / 2);
       
-      // Add some rotation for visual effect - steps twist as they ascend
-      step.rotation.y = t * Math.PI * 0.15;
-      
+      step.position.set(0, y, z);
       step.castShadow = true;
       step.receiveShadow = true;
       this.stairsGroup.add(step);
@@ -300,58 +297,240 @@ class TemplesManager {
       // Add collision for each step
       this.collisionManager.addCollider({
         position: new THREE.Vector3(
-          this.templeGroup.position.x,
-          this.templeGroup.position.y + y + i * stepSpacing,
-          this.templeGroup.position.z + z
+          templeX, 
+          stepHeight/2 + i * stepHeight, 
+          templeZ + z
         ),
         radius: Math.max(stepWidth, stepDepth) / 2,
         type: 'box',
-        width: stepWidth - (t * 2),
+        width: stepWidth,
         height: stepHeight,
         depth: stepDepth
       });
+    }
+    
+    // Create side walls/railings to prevent falling
+    const railingHeight = 1;
+    const railingGeometry = new THREE.BoxGeometry(0.5, railingHeight, horizontalDistance);
+    const railingMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: marbleTexture,
+      roughness: 0.5,
+      metalness: 0.1
+    });
+    
+    // Left railing
+    const leftRailing = new THREE.Mesh(railingGeometry, railingMaterial);
+    leftRailing.position.set(-stepWidth/2 - 0.25, verticalDistance/2, (startPoint.z + endPoint.z)/2);
+    leftRailing.castShadow = true;
+    this.stairsGroup.add(leftRailing);
+    
+    // Right railing
+    const rightRailing = new THREE.Mesh(railingGeometry, railingMaterial);
+    rightRailing.position.set(stepWidth/2 + 0.25, verticalDistance/2, (startPoint.z + endPoint.z)/2);
+    rightRailing.castShadow = true;
+    this.stairsGroup.add(rightRailing);
+    
+    // Add railing posts for aesthetic detail
+    for (let i = 0; i < 8; i++) {
+      const z = startPoint.z - (i * horizontalDistance / 7);
+      const postGeometry = new THREE.BoxGeometry(0.8, railingHeight * 2, 0.8);
       
-      // Add ethereal glow beneath certain steps
-      if (i % 3 === 0) {
-        const light = new THREE.PointLight(0xaaccff, 0.5, 8);
-        light.position.set(0, y + i * stepSpacing - 0.5, z);
-        this.stairsGroup.add(light);
+      // Left post
+      const leftPost = new THREE.Mesh(postGeometry, railingMaterial);
+      leftPost.position.set(-stepWidth/2 - 0.25, railingHeight, z);
+      leftPost.castShadow = true;
+      this.stairsGroup.add(leftPost);
+      
+      // Right post
+      const rightPost = new THREE.Mesh(postGeometry, railingMaterial);
+      rightPost.position.set(stepWidth/2 + 0.25, railingHeight, z);
+      rightPost.castShadow = true;
+      this.stairsGroup.add(rightPost);
+      
+      // Add lanterns on some posts for lighting
+      if (i % 2 === 0) {
+        // Create lantern geometry
+        const lanternGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+        const lanternMaterial = new THREE.MeshStandardMaterial({
+          color: 0xffffaa,
+          emissive: 0xffffaa,
+          emissiveIntensity: 0.5,
+          transparent: true,
+          opacity: 0.7
+        });
+        
+        // Left lantern
+        const leftLantern = new THREE.Mesh(lanternGeometry, lanternMaterial);
+        leftLantern.position.set(-stepWidth/2 - 0.25, railingHeight * 2, z);
+        this.stairsGroup.add(leftLantern);
+        
+        // Right lantern
+        const rightLantern = new THREE.Mesh(lanternGeometry, lanternMaterial);
+        rightLantern.position.set(stepWidth/2 + 0.25, railingHeight * 2, z);
+        this.stairsGroup.add(rightLantern);
+        
+        // Add light sources
+        const leftLight = new THREE.PointLight(0xffffaa, 0.7, 8);
+        leftLight.position.copy(leftLantern.position);
+        this.stairsGroup.add(leftLight);
+        
+        const rightLight = new THREE.PointLight(0xffffaa, 0.7, 8);
+        rightLight.position.copy(rightLantern.position);
+        this.stairsGroup.add(rightLight);
       }
     }
     
-    // Add decorative elements to the staircase
-    this.addStaircaseDecoration(stepMaterial);
+    // Add a landing pad where stairs meet the island
+    const landingGeometry = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth * 2);
+    const landing = new THREE.Mesh(landingGeometry, stepMaterial);
+    landing.position.set(0, endY, endPoint.z - stepDepth);
+    landing.castShadow = true;
+    landing.receiveShadow = true;
+    this.stairsGroup.add(landing);
+    
+    // Add collision for landing
+    this.collisionManager.addCollider({
+      position: new THREE.Vector3(
+        templeX, 
+        templeY, 
+        templeZ + endPoint.z - stepDepth
+      ),
+      radius: Math.max(stepWidth, stepDepth * 2) / 2,
+      type: 'box',
+      width: stepWidth,
+      height: stepHeight,
+      depth: stepDepth * 2
+    });
     
     this.templeGroup.add(this.stairsGroup);
   }
   
-  addStaircaseDecoration(stepMaterial) {
-    // Add small decorative columns along the staircase
-    const columnGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.5, 8);
+  createGroundTeleporter(templeX, templeZ) {
+    // Create a teleporter at ground level for instant access
+    const teleporterPosition = new THREE.Vector3(
+      templeX,
+      0.5, // Just above ground level
+      templeZ + 45 // At the base of the stairs
+    );
     
-    for (let i = 0; i < 5; i++) {
-      // Left column
-      const leftColumn = new THREE.Mesh(columnGeometry, stepMaterial);
-      leftColumn.position.set(-2.5, -22 + i * 4, 40 - i * 5);
-      leftColumn.castShadow = true;
-      this.stairsGroup.add(leftColumn);
-      
-      // Right column
-      const rightColumn = new THREE.Mesh(columnGeometry, stepMaterial);
-      rightColumn.position.set(2.5, -22 + i * 4, 40 - i * 5);
-      rightColumn.castShadow = true;
-      this.stairsGroup.add(rightColumn);
-      
-      // Add small light on top of each column
-      const leftLight = new THREE.PointLight(0xffffaa, 0.5, 5);
-      leftLight.position.set(-2.5, -21 + i * 4, 40 - i * 5);
-      this.stairsGroup.add(leftLight);
-      
-      const rightLight = new THREE.PointLight(0xffffaa, 0.5, 5);
-      rightLight.position.set(2.5, -21 + i * 4, 40 - i * 5);
-      this.stairsGroup.add(rightLight);
-    }
+    // Visual effect for teleporter
+    const teleporterGeometry = new THREE.CylinderGeometry(3, 3, 0.1, 32);
+    const teleporterMaterial = new THREE.MeshStandardMaterial({
+      color: 0x88ccff,
+      emissive: 0x4488ff,
+      emissiveIntensity: 0.5,
+      transparent: true,
+      opacity: 0.7
+    });
+    
+    const teleporter = new THREE.Mesh(teleporterGeometry, teleporterMaterial);
+    teleporter.position.copy(teleporterPosition);
+    this.scene.add(teleporter);
+    
+    // Add point light for the teleporter
+    const teleporterLight = new THREE.PointLight(0x88ccff, 1.5, 10);
+    teleporterLight.position.copy(teleporterPosition);
+    teleporterLight.position.y += 0.5;
+    this.scene.add(teleporterLight);
+    
+    // Add animation data for teleporter
+    teleporter.userData = {
+      update: (time) => {
+        // Pulsing effect
+        teleporter.material.opacity = 0.4 + Math.sin(time * 0.003) * 0.3;
+        teleporterLight.intensity = 1 + Math.sin(time * 0.003) * 0.5;
+        
+        // Rotating effect
+        teleporter.rotation.y = time * 0.001;
+      }
+    };
+    
+    // Add to interactive objects for teleportation
+    this.playerController.addInteractiveObject({
+      object: teleporter,
+      position: teleporterPosition,
+      name: "Teleporter to Temple",
+      radius: 3,
+      interact: () => {
+        // Show dialog
+        this.dialogManager.showDialog("Mystic Voice", "The winds of Apollo lift you to the sacred temple...");
+        
+        // Teleport player to top of stairs
+        setTimeout(() => {
+          const landingPosition = new THREE.Vector3(
+            templeX,
+            this.templeGroup.position.y + 1.5, // Slightly above landing
+            templeZ + 15 // At the temple entrance
+          );
+          
+          this.playerController.setPosition(
+            landingPosition.x,
+            landingPosition.y,
+            landingPosition.z
+          );
+          
+          // Make player look at the temple
+          this.playerController.lookAt(new THREE.Vector3(templeX, landingPosition.y, templeZ));
+        }, 1500);
+      }
+    });
+    
+    // Add signpost explaining the teleporter and stairs
+    const signPost = this.createSignPost(
+      new THREE.Vector3(teleporterPosition.x + 5, 0.5, teleporterPosition.z),
+      "Temple Access", 
+      "Step into the glowing circle to teleport directly to the Temple of Apollo, or climb the grand staircase to approach with reverence."
+    );
+    this.scene.add(signPost);
   }
+  
+  createSignPost(position, title, text) {
+    const signGroup = new THREE.Group();
+    
+    // Create post
+    const postGeometry = new THREE.CylinderGeometry(0.1, 0.1, 2, 8);
+    const postMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8B4513,
+      roughness: 0.9
+    });
+    
+    const post = new THREE.Mesh(postGeometry, postMaterial);
+    post.position.y = 1;
+    signGroup.add(post);
+    
+    // Create sign board
+    const boardGeometry = new THREE.BoxGeometry(3, 1.5, 0.1);
+    const boardMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd2b48c,
+      roughness: 0.8
+    });
+    
+    const board = new THREE.Mesh(boardGeometry, boardMaterial);
+    board.position.y = 2;
+    board.rotation.y = Math.PI / 4; // Angle for better visibility
+    signGroup.add(board);
+    
+    // Add interactive functionality
+    this.playerController.addInteractiveObject({
+      object: board,
+      position: new THREE.Vector3(position.x, position.y + 2, position.z),
+      name: title,
+      radius: 5,
+      interact: () => {
+        this.dialogManager.showDialog(title, text);
+      }
+    });
+    
+    // Position the sign
+    signGroup.position.copy(position);
+    
+    return signGroup;
+  }
+
+  
+ 
+  
   
   createTempleStructure(marbleTexture, goldTexture, roofTileTexture) {
     // Create main temple structure on the island
@@ -1044,7 +1223,8 @@ class TemplesManager {
   }
   
   // Animation update method to be called in the main game loop
-  update(time) {
+   // Animation update method
+   update(time) {
     // Update any animated elements in the temple
     if (this.templeGroup) {
       // Update floating crystals
@@ -1054,20 +1234,15 @@ class TemplesManager {
         }
       });
       
-      // Update orb and light beam
-      this.templeGroup.children.forEach(child => {
+      // Update other animated elements
+      this.scene.children.forEach(child => {
         if (child.userData && child.userData.update) {
           child.userData.update(time);
         }
       });
       
-      // Update portal effect
-      if (this.portalTrigger && this.portalTrigger.userData && this.portalTrigger.userData.update) {
-        this.portalTrigger.userData.update(time);
-      }
-      
-      // Make the entire temple gently float
-      this.templeGroup.position.y = this.templeGroup.position.y + Math.sin(time * 0.0001) * 0.01;
+      // Gentler floating motion for the temple
+      this.templeGroup.position.y = this.templeGroup.position.y + Math.sin(time * 0.0001) * 0.005;
     }
   }
 }
