@@ -1,6 +1,6 @@
 /**
  * TemplesManager
- * Handles creation and management of temple structures
+ * Handles creation and management of the floating temple structure
  */
 class TemplesManager {
   constructor(scene, textureEngine, collisionManager, playerController, questManager, dialogManager) {
@@ -12,136 +12,256 @@ class TemplesManager {
     this.dialogManager = dialogManager;
     
     this.templeGroup = null;
+    this.islandGroup = null;
+    this.stairsGroup = null;
+    this.portalTrigger = null;
   }
   
   createTempleOfApollo() {
+    // Create main groups
     this.templeGroup = new THREE.Group();
+    this.islandGroup = new THREE.Group();
+    this.stairsGroup = new THREE.Group();
     
     // Get textures from texture engine
-    const { marbleTexture, goldTexture, roofTileTexture } = this.textureEngine.getTextures();
+    const { marbleTexture, goldTexture, roofTileTexture, stoneTexture } = this.textureEngine.getTextures();
     
-    // Calculate ground height at the temple position
-    let groundY = 0;
-    const templeX = -40;
-    const templeZ = -10;
-    const distFromCenter = Math.sqrt(templeX * templeX + templeZ * templeZ);
-    if (distFromCenter > 50) {
-      // Use same height calculation as in ground manager
-      groundY = Math.sin(templeX * 0.05) * Math.cos(templeZ * 0.05) * 2;
-      groundY += Math.sin(templeX * 0.01 + templeZ * 0.01) * 3;
-      const edgeFactor = (distFromCenter - 50) / 200;
-      groundY += edgeFactor * 10;
-    }
+    // Create floating island
+    this.createFloatingIsland(stoneTexture);
     
-    // Create temple platform (stylobate)
-    const platformGeometry = new THREE.BoxGeometry(30, 1.5, 20);
-    const platformMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      map: marbleTexture,
-      roughness: 0.5,
-      metalness: 0.1
-    });
-    const platform = new THREE.Mesh(platformGeometry, platformMaterial);
-    platform.position.y = 0.75 + groundY; // Position half height above ground
-    platform.receiveShadow = true;
-    this.templeGroup.add(platform);
+    // Create floating staircase
+    this.createFloatingStaircase(marbleTexture);
     
-    // Create temple steps
-    this.createTempleSteps(marbleTexture, groundY);
+    // Create temple on the island
+    this.createTempleStructure(marbleTexture, goldTexture, roofTileTexture);
     
-    // Create columns around perimeter
-    this.createTempleColumns(marbleTexture, groundY);
-    
-    // Create entablature (top of columns)
-    this.createEntablature(marbleTexture, groundY);
-    
-    // Create roof structure
-    this.createRoof(roofTileTexture, groundY);
-    
-    // Create pediments (triangular parts under the roof)
-    this.createPediments(marbleTexture, groundY);
-    
-    // Create temple interior
-    this.createTempleInterior(marbleTexture, groundY);
-    
-    // Create Apollo statue inside
-    this.createApolloStatue(marbleTexture, goldTexture, groundY);
-    
-    // Create instrument displays
-    this.createInstrumentDisplays(marbleTexture, goldTexture, groundY);
-    
-    // Create an NPC temple keeper
-    this.createTempleKeeper(groundY);
-    
-    // Add lighting to emphasize the temple
+    // Create lighting and atmosphere
     this.addTempleLighting();
+    this.addAtmosphericEffects();
     
-    // Position the temple
-    this.templeGroup.position.set(-40, 0, -10);
-      
-    // Add temple to interactive objects
-    this.playerController.addInteractiveObject({
-      position: new THREE.Vector3(-40, groundY, 4), // Position in front of the temple
-      name: "Temple of Apollo",
-      radius: 5,
-      interact: () => {
-        this.dialogManager.showDialog("Temple Keeper", "Welcome to the Temple of Apollo, home of the divine musical instruments. I am the keeper of these sacred relics. Would you like to learn about the instruments inside?");
-        this.questManager.setTempleFound(true);
-      }
-    });
+    // Position the entire temple complex
+    const templeX = -40;
+    const templeY = 40; // Floating high in the air
+    const templeZ = -10;
     
+    this.templeGroup.position.set(templeX, templeY, templeZ);
     this.scene.add(this.templeGroup);
     
-    // Create temple glow
-    const templeGlow = new THREE.PointLight(0xffffdd, 0.5, 50);
-    templeGlow.position.set(-40, 10 + groundY, -10);
-    this.scene.add(templeGlow);
+    // Create portal trigger at the temple entrance
+    this.createPortalTrigger(templeX, templeY, templeZ);
     
-    // Add golden marker arrow pointing to the temple (quest marker)
-    this.questManager.createQuestMarker(new THREE.Vector3(-40, 15 + groundY, -6));
-    this.collisionManager.addCollider({
-      position: new THREE.Vector3(-40, 0.75 + groundY, -10),
-      radius: 15,
-      type: 'box',
-      width: 30,
-      height: 1.5,
-      depth: 20
-    });
+    // Add visual quest marker
+    this.questManager.createQuestMarker(new THREE.Vector3(templeX, templeY + 15, templeZ - 6));
     
-      // FIX: Add proper collision for temple platform
-  this.collisionManager.addCollider({
-    position: new THREE.Vector3(-40, 0.75 + groundY, -10),
-    radius: 15,
-    type: 'box',
-    width: 30,
-    height: 1.5,
-    depth: 20
-  });
-  
-  // FIX: Add proper collision for temple steps
-  const stepPositions = [
-    {x: -40, y: 0.2 + groundY, z: -10, width: 32, depth: 22, height: 0.4},
-    {x: -40, y: 0.6 + groundY, z: -10, width: 31, depth: 21, height: 0.4}
-  ];
-  
-  stepPositions.forEach(step => {
-    this.collisionManager.addCollider({
-      position: new THREE.Vector3(step.x, step.y, step.z),
-      radius: Math.max(step.width, step.depth)/2,
-      type: 'box',
-      width: step.width,
-      height: step.height,
-      depth: step.depth
-    });
-  });
     return this.templeGroup;
   }
   
-  createTempleSteps(marbleTexture, groundY = 0) {
-    const steps = [
-      { width: 32, depth: 22, height: 0.4, y: 0.2 },
-      { width: 31, depth: 21, height: 0.4, y: 0.6 }
-    ];
+  createFloatingIsland(stoneTexture) {
+    // Create a circular island base
+    const islandRadius = 25;
+    const islandHeight = 10;
+    
+    // Main island mass
+    const islandGeometry = new THREE.CylinderGeometry(islandRadius, islandRadius * 1.2, islandHeight, 32);
+    const islandMaterial = new THREE.MeshStandardMaterial({
+      map: stoneTexture,
+      roughness: 0.8,
+      metalness: 0.2,
+      color: 0x889988
+    });
+    
+    const islandMesh = new THREE.Mesh(islandGeometry, islandMaterial);
+    islandMesh.position.y = -islandHeight/2;
+    islandMesh.castShadow = true;
+    islandMesh.receiveShadow = true;
+    this.islandGroup.add(islandMesh);
+    
+    // Add rock formations around the edge
+    for (let i = 0; i < 18; i++) {
+      const angle = (i / 18) * Math.PI * 2;
+      const radius = islandRadius * 0.9;
+      
+      const rockHeight = 2 + Math.random() * 3;
+      const rockGeometry = new THREE.ConeGeometry(
+        1 + Math.random(), 
+        rockHeight, 
+        5 + Math.floor(Math.random() * 3)
+      );
+      
+      const rockMaterial = new THREE.MeshStandardMaterial({
+        map: stoneTexture,
+        color: 0x7a8a7a,
+        roughness: 0.9,
+        metalness: 0.1
+      });
+      
+      const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+      rock.position.set(
+        Math.cos(angle) * radius,
+        rockHeight/2,
+        Math.sin(angle) * radius
+      );
+      rock.rotation.y = Math.random() * Math.PI;
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      this.islandGroup.add(rock);
+    }
+    
+    // Add ground surface on top of the island
+    const surfaceGeometry = new THREE.CircleGeometry(islandRadius * 0.95, 32);
+    const surfaceMaterial = new THREE.MeshStandardMaterial({
+      color: 0x91a185,
+      roughness: 0.8,
+      metalness: 0.1
+    });
+    
+    const surface = new THREE.Mesh(surfaceGeometry, surfaceMaterial);
+    surface.rotation.x = -Math.PI / 2;
+    surface.position.y = 0.1;
+    surface.receiveShadow = true;
+    this.islandGroup.add(surface);
+    
+    // Add some vegetation and small details
+    this.addIslandVegetation();
+    
+    // Add floating crystal formations for mystical effect
+    this.addFloatingCrystals();
+    
+    // Add collision for the island surface
+    this.collisionManager.addCollider({
+      position: new THREE.Vector3(0, 0, 0),
+      radius: islandRadius,
+      type: 'cylinder',
+      height: 0.2
+    });
+    
+    this.templeGroup.add(this.islandGroup);
+  }
+  
+  addIslandVegetation() {
+    // Add small bushes and plants
+    const bushGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+    const bushMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4a6d4a,
+      roughness: 0.9
+    });
+    
+    for (let i = 0; i < 25; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 10 + Math.random() * 12;
+      
+      const bush = new THREE.Mesh(bushGeometry, bushMaterial);
+      bush.position.set(
+        Math.cos(angle) * radius,
+        0.3,
+        Math.sin(angle) * radius
+      );
+      bush.scale.set(
+        0.5 + Math.random() * 0.5,
+        0.5 + Math.random() * 0.5,
+        0.5 + Math.random() * 0.5
+      );
+      bush.castShadow = true;
+      bush.receiveShadow = true;
+      this.islandGroup.add(bush);
+    }
+    
+    // Add flower patches
+    const flowerColors = [0xe7493a, 0xffeb3b, 0xf5b8d1, 0xe91e63, 0xffffff];
+    for (let i = 0; i < 40; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 8 + Math.random() * 14;
+      
+      const flowerGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+      const flowerMaterial = new THREE.MeshStandardMaterial({
+        color: flowerColors[Math.floor(Math.random() * flowerColors.length)],
+        roughness: 0.8,
+        metalness: 0.1
+      });
+      
+      const flower = new THREE.Mesh(flowerGeometry, flowerMaterial);
+      flower.position.set(
+        Math.cos(angle) * radius,
+        0.2,
+        Math.sin(angle) * radius
+      );
+      this.islandGroup.add(flower);
+      
+      // Add stem
+      const stemGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.2, 4);
+      const stemMaterial = new THREE.MeshStandardMaterial({
+        color: 0x2e7d32,
+        roughness: 0.9
+      });
+      
+      const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+      stem.position.set(
+        Math.cos(angle) * radius,
+        0.1,
+        Math.sin(angle) * radius
+      );
+      this.islandGroup.add(stem);
+    }
+  }
+  
+  addFloatingCrystals() {
+    const crystalGeometry = new THREE.ConeGeometry(0.5, 2, 5);
+    const crystalMaterial = new THREE.MeshStandardMaterial({
+      color: 0x88aaff,
+      transparent: true,
+      opacity: 0.7,
+      roughness: 0.1,
+      metalness: 0.9
+    });
+    
+    // Add floating crystals around the island
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const radius = 20;
+      
+      const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
+      crystal.position.set(
+        Math.cos(angle) * radius,
+        2 + Math.sin(i * 0.5) * 3,
+        Math.sin(angle) * radius
+      );
+      
+      // Rotate crystal to point outward
+      crystal.rotation.x = Math.PI;
+      crystal.rotation.y = angle;
+      
+      crystal.castShadow = true;
+      this.islandGroup.add(crystal);
+      
+      // Add point light inside crystal
+      const light = new THREE.PointLight(0x88aaff, 0.5, 5);
+      light.position.copy(crystal.position);
+      this.islandGroup.add(light);
+      
+      // Store animation data for floating motion
+      crystal.userData = {
+        initialY: crystal.position.y,
+        angle: i,
+        update: (time) => {
+          crystal.position.y = crystal.userData.initialY + Math.sin(time * 0.001 + i) * 0.5;
+          crystal.rotation.z = Math.sin(time * 0.0005 + i * 0.5) * 0.1;
+        }
+      };
+    }
+  }
+  
+  createFloatingStaircase(marbleTexture) {
+    // Create a series of floating steps leading up to the island
+    const startY = -30; // Starting point below the island
+    const endY = 0;     // End at island surface
+    const startZ = 50;  // Start far from the island
+    const endZ = 20;    // End at the edge of the island
+    
+    const stepCount = 15;
+    const stepWidth = 6;
+    const stepDepth = 3;
+    const stepHeight = 0.5;
+    
     const stepMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: marbleTexture,
@@ -149,102 +269,260 @@ class TemplesManager {
       metalness: 0.1
     });
     
+    for (let i = 0; i < stepCount; i++) {
+      // Calculate step position based on curve
+      const t = i / (stepCount - 1);
+      const y = startY + (endY - startY) * t;
+      const z = startZ - (startZ - endZ) * (t * t); // Quadratic curve for nicer approach
+      
+      // Make steps get closer together as they ascend
+      const stepSpacing = 1 - (0.5 * t);
+      
+      // Create step geometry and offset initial steps for curved approach
+      const stepGeometry = new THREE.BoxGeometry(
+        stepWidth - (t * 2), // Steps get narrower as they approach the island
+        stepHeight,
+        stepDepth
+      );
+      
+      const step = new THREE.Mesh(stepGeometry, stepMaterial);
+      
+      // Position step with slight rotation for curved approach
+      step.position.set(0, y + i * stepSpacing, z);
+      
+      // Add some rotation for visual effect - steps twist as they ascend
+      step.rotation.y = t * Math.PI * 0.15;
+      
+      step.castShadow = true;
+      step.receiveShadow = true;
+      this.stairsGroup.add(step);
+      
+      // Add collision for each step
+      this.collisionManager.addCollider({
+        position: new THREE.Vector3(
+          this.templeGroup.position.x,
+          this.templeGroup.position.y + y + i * stepSpacing,
+          this.templeGroup.position.z + z
+        ),
+        radius: Math.max(stepWidth, stepDepth) / 2,
+        type: 'box',
+        width: stepWidth - (t * 2),
+        height: stepHeight,
+        depth: stepDepth
+      });
+      
+      // Add ethereal glow beneath certain steps
+      if (i % 3 === 0) {
+        const light = new THREE.PointLight(0xaaccff, 0.5, 8);
+        light.position.set(0, y + i * stepSpacing - 0.5, z);
+        this.stairsGroup.add(light);
+      }
+    }
+    
+    // Add decorative elements to the staircase
+    this.addStaircaseDecoration(stepMaterial);
+    
+    this.templeGroup.add(this.stairsGroup);
+  }
+  
+  addStaircaseDecoration(stepMaterial) {
+    // Add small decorative columns along the staircase
+    const columnGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.5, 8);
+    
+    for (let i = 0; i < 5; i++) {
+      // Left column
+      const leftColumn = new THREE.Mesh(columnGeometry, stepMaterial);
+      leftColumn.position.set(-2.5, -22 + i * 4, 40 - i * 5);
+      leftColumn.castShadow = true;
+      this.stairsGroup.add(leftColumn);
+      
+      // Right column
+      const rightColumn = new THREE.Mesh(columnGeometry, stepMaterial);
+      rightColumn.position.set(2.5, -22 + i * 4, 40 - i * 5);
+      rightColumn.castShadow = true;
+      this.stairsGroup.add(rightColumn);
+      
+      // Add small light on top of each column
+      const leftLight = new THREE.PointLight(0xffffaa, 0.5, 5);
+      leftLight.position.set(-2.5, -21 + i * 4, 40 - i * 5);
+      this.stairsGroup.add(leftLight);
+      
+      const rightLight = new THREE.PointLight(0xffffaa, 0.5, 5);
+      rightLight.position.set(2.5, -21 + i * 4, 40 - i * 5);
+      this.stairsGroup.add(rightLight);
+    }
+  }
+  
+  createTempleStructure(marbleTexture, goldTexture, roofTileTexture) {
+    // Create main temple structure on the island
+    
+    // Temple dimensions
+    const width = 20;
+    const depth = 15;
+    const height = 8;
+    
+    // Create temple platform
+    const platformGeometry = new THREE.BoxGeometry(width + 4, 1.5, depth + 4);
+    const platformMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: marbleTexture,
+      roughness: 0.5,
+      metalness: 0.1
+    });
+    
+    const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+    platform.position.y = 0.75;
+    platform.receiveShadow = true;
+    this.templeGroup.add(platform);
+    
+    // Add steps leading to platform
+    const steps = [
+      { width: width + 6, depth: 2, height: 0.4, z: depth / 2 + 3 },
+      { width: width + 5, depth: 2, height: 0.4, z: depth / 2 + 1 }
+    ];
+    
     steps.forEach(stepData => {
       const stepGeometry = new THREE.BoxGeometry(stepData.width, stepData.height, stepData.depth);
-      const step = new THREE.Mesh(stepGeometry, stepMaterial);
-      step.position.y = stepData.y + groundY;
+      const step = new THREE.Mesh(stepGeometry, platformMaterial);
+      step.position.set(0, stepData.height / 2, stepData.z);
       step.receiveShadow = true;
       this.templeGroup.add(step);
     });
+    
+    // Create temple columns
+    this.createTempleColumns(marbleTexture);
+    
+    // Create temple walls
+    const wallGeometry = new THREE.BoxGeometry(width - 2, height - 2, depth - 2);
+    const wallMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf5f5f5,
+      map: marbleTexture,
+      roughness: 0.5,
+      metalness: 0.1
+    });
+    
+    const walls = new THREE.Mesh(wallGeometry, wallMaterial);
+    walls.position.y = height / 2 + 0.75;
+    walls.castShadow = true;
+    walls.receiveShadow = true;
+    this.templeGroup.add(walls);
+    
+    // Create roof
+    const roofGeometry = new THREE.CylinderGeometry(0.1, 0.1, width, 4, 1, false, Math.PI / 4, Math.PI / 2);
+    roofGeometry.rotateZ(Math.PI / 2);
+    roofGeometry.scale(1, 1.5, depth);
+    
+    const roofMaterial = new THREE.MeshStandardMaterial({
+      map: roofTileTexture,
+      roughness: 0.7,
+      metalness: 0.2
+    });
+    
+    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+    roof.position.y = height + 2;
+    roof.castShadow = true;
+    this.templeGroup.add(roof);
+    
+    // Create pediments (triangular parts under the roof)
+    this.createPediments(marbleTexture);
+    
+    // Create doorway
+    const doorwayGeometry = new THREE.BoxGeometry(4, 7, 1);
+    const doorwayMaterial = new THREE.MeshStandardMaterial({
+      color: 0x111111,
+      roughness: 0.8,
+      metalness: 0.2
+    });
+    
+    const doorway = new THREE.Mesh(doorwayGeometry, doorwayMaterial);
+    doorway.position.set(0, 4, depth / 2 - 0.5);
+    this.templeGroup.add(doorway);
+    
+    // Add golden accents
+    this.addGoldenAccents(goldTexture);
+    
+    // Create interior space
+    this.createTempleInterior(marbleTexture);
+    
+    // Add collider for the main temple structure
+    this.collisionManager.addCollider({
+      position: new THREE.Vector3(
+        this.templeGroup.position.x,
+        this.templeGroup.position.y + 0.75,
+        this.templeGroup.position.z
+      ),
+      radius: Math.max(width, depth) / 2,
+      type: 'box',
+      width: width,
+      height: 1.5,
+      depth: depth
+    });
   }
-
-  createTempleColumns(marbleTexture, groundY = 0) {
+  
+  createTempleColumns(marbleTexture) {
     // Create columns around perimeter
-    const columnDepth = 6;
-    const columnWidth = 12;
+    const columnHeight = 7;
+    const columnPositions = [];
     
-    // Front and back columns (shorter sides)
-    for (let i = 0; i < columnWidth; i++) {
-      const xPos = -12.5 + i * (25 / (columnWidth - 1));
-      
-      // Front columns
-      const frontColumn = this.createColumn(5, marbleTexture);
-      frontColumn.position.set(xPos, 1.5 + groundY, 9);
-      this.templeGroup.add(frontColumn);
-      
-      // FIX: Add proper collision for front columns with height
-      this.collisionManager.addCollider({
-        position: new THREE.Vector3(xPos + this.templeGroup.position.x, 3 + groundY, 9 + this.templeGroup.position.z),
-        radius: 0.8,
-        type: 'cylinder',
-        height: 5
-      });
-      
-      // Back columns
-      const backColumn = this.createColumn(5, marbleTexture);
-      backColumn.position.set(xPos, 1.5 + groundY, -9);
-      this.templeGroup.add(backColumn);
-      
-      // FIX: Add proper collision for back columns with height
-      this.collisionManager.addCollider({
-        position: new THREE.Vector3(xPos + this.templeGroup.position.x, 3 + groundY, -9 + this.templeGroup.position.z),
-        radius: 0.8,
-        type: 'cylinder',
-        height: 5
-      });
+    // Front columns (entrance)
+    for (let i = 0; i < 6; i++) {
+      const x = -10 + i * 4;
+      columnPositions.push({ x, z: 7.5 });
     }
     
-    // Side columns (longer sides)
-    for (let i = 1; i < columnDepth - 1; i++) {
-      const zPos = 9 - i * (18 / (columnDepth - 1));
-      
-      // Left side columns
-      const leftColumn = this.createColumn(5, marbleTexture);
-      leftColumn.position.set(-12.5, 1.5 + groundY, zPos);
-      this.templeGroup.add(leftColumn);
-      
-      // FIX: Add proper collision for left columns with height
-      this.collisionManager.addCollider({
-        position: new THREE.Vector3(-12.5 + this.templeGroup.position.x, 3 + groundY, zPos + this.templeGroup.position.z),
-        radius: 0.8,
-        type: 'cylinder',
-        height: 5
-      });
-      
-      // Right side columns
-      const rightColumn = this.createColumn(5, marbleTexture);
-      rightColumn.position.set(12.5, 1.5 + groundY, zPos);
-      this.templeGroup.add(rightColumn);
-      
-      // FIX: Add proper collision for right columns with height
-      this.collisionManager.addCollider({
-        position: new THREE.Vector3(12.5 + this.templeGroup.position.x, 3 + groundY, zPos + this.templeGroup.position.z),
-        radius: 0.8,
-        type: 'cylinder',
-        height: 5
-      });
+    // Side columns
+    for (let i = 1; i < 4; i++) {
+      const z = 7.5 - i * 5;
+      // Left side
+      columnPositions.push({ x: -10, z });
+      // Right side
+      columnPositions.push({ x: 10, z });
     }
+    
+    // Back columns
+    for (let i = 0; i < 6; i++) {
+      const x = -10 + i * 4;
+      columnPositions.push({ x, z: -7.5 });
+    }
+    
+    // Create each column
+    columnPositions.forEach(pos => {
+      const column = this.createColumn(columnHeight, marbleTexture);
+      column.position.set(pos.x, 1.5, pos.z);
+      this.templeGroup.add(column);
+      
+      // Add collision for the column
+      this.collisionManager.addCollider({
+        position: new THREE.Vector3(
+          this.templeGroup.position.x + pos.x,
+          this.templeGroup.position.y,
+          this.templeGroup.position.z + pos.z
+        ),
+        radius: 0.8
+      });
+    });
   }
   
   createColumn(height, marbleTexture) {
     const columnGroup = new THREE.Group();
     
     // Base
-    const baseGeometry = new THREE.CylinderGeometry(0.8, 0.8, 0.3, 32);
+    const baseGeometry = new THREE.CylinderGeometry(0.8, 0.8, 0.3, 24);
     const baseMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: marbleTexture,
       roughness: 0.5,
       metalness: 0.1
     });
+    
     const base = new THREE.Mesh(baseGeometry, baseMaterial);
-    base.position.y = 0.15; // Half height above ground
+    base.position.y = 0.15;
     base.castShadow = true;
     base.receiveShadow = true;
     columnGroup.add(base);
     
-    // Shaft - using closed cylinder to avoid seams
-    const shaftGeometry = new THREE.CylinderGeometry(0.6, 0.7, height, 32, 6, false);
+    // Shaft
+    const shaftGeometry = new THREE.CylinderGeometry(0.6, 0.7, height, 24, 8, false);
     const shaftMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: marbleTexture,
@@ -252,13 +530,13 @@ class TemplesManager {
       metalness: 0.1
     });
     
-    // Create bump map for fluting effect instead of modifying geometry
+    // Create bump map for fluting effect using canvas
     const bumpCanvas = document.createElement('canvas');
     bumpCanvas.width = 512;
     bumpCanvas.height = 512;
     const ctx = bumpCanvas.getContext('2d');
     
-    // Create fluting pattern using canvas
+    // Create fluting pattern
     const flutingCount = 24;
     ctx.fillStyle = '#808080';
     ctx.fillRect(0, 0, 512, 512);
@@ -284,95 +562,49 @@ class TemplesManager {
     shaftMaterial.bumpScale = 0.05;
     
     const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
-    shaft.position.y = height/2 + 0.3; // Position on top of base
+    shaft.position.y = height/2 + 0.3;
     shaft.castShadow = true;
     columnGroup.add(shaft);
     
-    // Capital
-    const capitalGeometry = new THREE.CylinderGeometry(0.9, 0.6, 0.4, 32);
-    const capitalMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      map: marbleTexture,
-      roughness: 0.5,
-      metalness: 0.1
-    });
-    const capital = new THREE.Mesh(capitalGeometry, capitalMaterial);
-    capital.position.y = height + 0.5; // Position on top of shaft
+    // Capital (column top)
+    const capitalGeometry = new THREE.CylinderGeometry(0.9, 0.6, 0.4, 24);
+    const capital = new THREE.Mesh(capitalGeometry, baseMaterial);
+    capital.position.y = height + 0.5;
     capital.castShadow = true;
     columnGroup.add(capital);
     
-    // Add details to capital (simplified Ionic volutes)
+    // Add decorative volutes to capital (ionic style)
     const voluteGeometry = new THREE.TorusGeometry(0.15, 0.05, 8, 16, Math.PI);
-    const voluteMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      map: marbleTexture,
-      roughness: 0.5,
-      metalness: 0.1
-    });
     
     // Left volute
-    const leftVolute = new THREE.Mesh(voluteGeometry, voluteMaterial);
+    const leftVolute = new THREE.Mesh(voluteGeometry, baseMaterial);
     leftVolute.position.set(-0.45, height + 0.5, 0);
     leftVolute.rotation.y = Math.PI / 2;
     columnGroup.add(leftVolute);
     
     // Right volute
-    const rightVolute = new THREE.Mesh(voluteGeometry, voluteMaterial);
+    const rightVolute = new THREE.Mesh(voluteGeometry, baseMaterial);
     rightVolute.position.set(0.45, height + 0.5, 0);
     rightVolute.rotation.y = -Math.PI / 2;
     columnGroup.add(rightVolute);
     
-    // Top abacus
+    // Top abacus (square plate)
     const abacusGeometry = new THREE.BoxGeometry(1.8, 0.3, 1.8);
-    const abacusMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      map: marbleTexture,
-      roughness: 0.5,
-      metalness: 0.1
-    });
-    const abacus = new THREE.Mesh(abacusGeometry, abacusMaterial);
-    abacus.position.y = height + 0.7; // Position on top of capital
+    const abacus = new THREE.Mesh(abacusGeometry, baseMaterial);
+    abacus.position.y = height + 0.7;
     abacus.castShadow = true;
     columnGroup.add(abacus);
     
     return columnGroup;
   }
   
-  createEntablature(marbleTexture, groundY = 0) {
-    const entablatureGeometry = new THREE.BoxGeometry(30, 1.5, 20);
-    const entablatureMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      map: marbleTexture,
-      roughness: 0.5,
-      metalness: 0.1
-    });
-    const entablature = new THREE.Mesh(entablatureGeometry, entablatureMaterial);
-    entablature.position.y = 7.5 + groundY; // Position on top of columns
-    entablature.castShadow = true;
-    entablature.receiveShadow = true;
-    this.templeGroup.add(entablature);
-  }
-  
-  createRoof(roofTileTexture, groundY = 0) {
-    const roofGeometry = new THREE.CylinderGeometry(0.1, 0.1, 30, 4, 1, false, Math.PI / 4, Math.PI / 2);
-    roofGeometry.rotateZ(Math.PI / 2);
-    roofGeometry.scale(1, 3, 20);
-    const roofMaterial = new THREE.MeshStandardMaterial({
-      map: roofTileTexture,
-      roughness: 0.7,
-      metalness: 0.1
-    });
-    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-    roof.position.y = 9.5 + groundY; // Position on top of entablature
-    roof.castShadow = true;
-    this.templeGroup.add(roof);
-  }
-  
-  createPediments(marbleTexture, groundY = 0) {
-    const pedimentGeometry = new THREE.CylinderGeometry(0.1, 0.1, 30, 3, 1, false, 0, Math.PI);
+  createPediments(marbleTexture) {
+    // Create triangular pediments at front and back
+    const pedimentGeometry = new THREE.CylinderGeometry(0.1, 0.1, 20, 3, 1, false, 0, Math.PI);
     pedimentGeometry.rotateZ(Math.PI / 2);
     pedimentGeometry.rotateY(Math.PI / 2);
-    pedimentGeometry.scale(1, 1.8, 1);
+    pedimentGeometry.scale(1, 2, 1);
+    
     const pedimentMaterial = new THREE.MeshStandardMaterial({
       color: 0xf5f5f5,
       map: marbleTexture,
@@ -382,400 +614,460 @@ class TemplesManager {
     
     // Front pediment
     const frontPediment = new THREE.Mesh(pedimentGeometry, pedimentMaterial);
-    frontPediment.position.set(0, 8.75 + groundY, 10);
+    frontPediment.position.set(0, 9, 8);
     frontPediment.castShadow = true;
     this.templeGroup.add(frontPediment);
     
     // Back pediment
     const backPediment = new THREE.Mesh(pedimentGeometry, pedimentMaterial);
-    backPediment.position.set(0, 8.75 + groundY, -10);
+    backPediment.position.set(0, 9, -8);
     backPediment.rotation.y = Math.PI;
     backPediment.castShadow = true;
     this.templeGroup.add(backPediment);
-  }
-  
-  createTempleInterior(marbleTexture, groundY = 0) {
-    const wallMaterial = new THREE.MeshStandardMaterial({
+    
+    // Add decorative relief to front pediment
+    const sunGeometry = new THREE.CircleGeometry(1.5, 16);
+    const sunMaterial = new THREE.MeshStandardMaterial({
       color: 0xfafafa,
-      map: marbleTexture,
       roughness: 0.5,
       metalness: 0.1
     });
     
-    // Back wall
-    const backWallGeometry = new THREE.BoxGeometry(20, 5, 0.5);
-    const backWall = new THREE.Mesh(backWallGeometry, wallMaterial);
-    backWall.position.set(0, 4 + groundY, -6);
-    backWall.castShadow = true;
-    backWall.receiveShadow = true;
-    this.templeGroup.add(backWall);
+    const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+    sun.position.set(0, 9, 8.1);
+    sun.castShadow = true;
+    this.templeGroup.add(sun);
     
-    // Side walls
-    const sideWallGeometry = new THREE.BoxGeometry(0.5, 5, 14);
-    
-    // Left wall
-    const leftWall = new THREE.Mesh(sideWallGeometry, wallMaterial);
-    leftWall.position.set(-9.75, 4 + groundY, 0);
-    leftWall.castShadow = true;
-    leftWall.receiveShadow = true;
-    this.templeGroup.add(leftWall);
-    
-    // Right wall
-    const rightWall = new THREE.Mesh(sideWallGeometry, wallMaterial);
-    rightWall.position.set(9.75, 4 + groundY, 0);
-    rightWall.castShadow = true;
-    rightWall.receiveShadow = true;
-    this.templeGroup.add(rightWall);
-    
-    // Create doorway
-    const doorwayGeometry = new THREE.BoxGeometry(5, 4, 2);
-    const doorwayMaterial = new THREE.MeshStandardMaterial({
-      color: 0x111111,
-      roughness: 0.8,
-      metalness: 0.2
-    });
-    const doorway = new THREE.Mesh(doorwayGeometry, doorwayMaterial);
-    doorway.position.set(0, 3 + groundY, 6);
-    this.templeGroup.add(doorway);
-    
-    // Create interior floor
-    const floorGeometry = new THREE.BoxGeometry(19.5, 0.2, 14);
-    const floorMaterial = new THREE.MeshStandardMaterial({
-      color: 0xeeeeee,
-      map: marbleTexture,
-      roughness: 0.4,
-      metalness: 0.1
-    });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.position.y = 1.6 + groundY; // Position on top of platform
-    floor.receiveShadow = true;
-    this.templeGroup.add(floor);
+    // Add rays around sun
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const rayGeometry = new THREE.BoxGeometry(0.2, 1, 0.05);
+      const ray = new THREE.Mesh(rayGeometry, sunMaterial);
+      
+      ray.position.set(
+        Math.cos(angle) * 2,
+        9 + Math.sin(angle) * 2,
+        8.15
+      );
+      ray.rotation.z = angle;
+      this.templeGroup.add(ray);
+    }
   }
   
-  createApolloStatue(marbleTexture, goldTexture, groundY = 0) {
-    const statueGroup = new THREE.Group();
-    
-    // Create base
-    const baseGeometry = new THREE.CylinderGeometry(1.5, 1.5, 0.5, 32);
-    const baseMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      map: marbleTexture,
-      roughness: 0.5,
-      metalness: 0.1
-    });
-    const base = new THREE.Mesh(baseGeometry, baseMaterial);
-    base.position.y = 0.25; // Half height above ground
-    base.receiveShadow = true;
-    statueGroup.add(base);
-    
-    // Create statue body
-    const bodyMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      map: marbleTexture,
-      roughness: 0.5,
-      metalness: 0.1
-    });
-    
-    // Torso
-    const torsoGeometry = new THREE.CylinderGeometry(0.6, 0.5, 1.5, 8);
-    const torso = new THREE.Mesh(torsoGeometry, bodyMaterial);
-    torso.position.y = 1.5; // Position above base
-    torso.castShadow = true;
-    statueGroup.add(torso);
-    
-    // Head
-    const headGeometry = new THREE.SphereGeometry(0.4, 16, 16);
-    const head = new THREE.Mesh(headGeometry, bodyMaterial);
-    head.position.y = 2.7; // Position on top of torso
-    head.castShadow = true;
-    statueGroup.add(head);
-    
-    // Arms
-    const armGeometry = new THREE.CylinderGeometry(0.15, 0.15, 1.2, 8);
-    
-    // Right arm (holding lyre)
-    const rightArm = new THREE.Mesh(armGeometry, bodyMaterial);
-    rightArm.position.set(0.7, 1.8, 0);
-    rightArm.rotation.z = -Math.PI / 4;
-    rightArm.castShadow = true;
-    statueGroup.add(rightArm);
-    
-    // Left arm (extended)
-    const leftArm = new THREE.Mesh(armGeometry, bodyMaterial);
-    leftArm.position.set(-0.7, 1.8, 0);
-    leftArm.rotation.z = Math.PI / 4;
-    leftArm.castShadow = true;
-    statueGroup.add(leftArm);
-    
-    // Legs
-    const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.5, 8);
-    
-    // Right leg
-    const rightLeg = new THREE.Mesh(legGeometry, bodyMaterial);
-    rightLeg.position.set(0.3, 0.75, 0);
-    rightLeg.castShadow = true;
-    statueGroup.add(rightLeg);
-    
-    // Left leg
-    const leftLeg = new THREE.Mesh(legGeometry, bodyMaterial);
-    leftLeg.position.set(-0.3, 0.75, 0);
-    leftLeg.castShadow = true;
-    statueGroup.add(leftLeg);
-    
-    // Create small lyre in hand
-    const lyreGroup = new THREE.Group();
-    
-    // Lyre body
-    const lyreBodyGeometry = new THREE.CylinderGeometry(0.2, 0.25, 0.4, 16, 1, false, 0, Math.PI);
-    const lyreBodyMaterial = new THREE.MeshStandardMaterial({
+  addGoldenAccents(goldTexture) {
+    // Add golden decorative elements
+    const goldMaterial = new THREE.MeshStandardMaterial({
       color: 0xd4af37,
       map: goldTexture,
       roughness: 0.3,
       metalness: 0.8
     });
-    const lyreBody = new THREE.Mesh(lyreBodyGeometry, lyreBodyMaterial);
+    
+    // Create decorative band along the top of the walls
+    const bandGeometry = new THREE.BoxGeometry(20, 0.5, 15);
+    const band = new THREE.Mesh(bandGeometry, goldMaterial);
+    band.position.y = 7.5;
+    band.castShadow = true;
+    this.templeGroup.add(band);
+    
+    // Add golden ornaments on corners
+    const cornerPositions = [
+      { x: 9, z: 7 },
+      { x: -9, z: 7 },
+      { x: 9, z: -7 },
+      { x: -9, z: -7 }
+    ];
+    
+    cornerPositions.forEach(pos => {
+      const ornamentGeometry = new THREE.SphereGeometry(0.6, 16, 16);
+      const ornament = new THREE.Mesh(ornamentGeometry, goldMaterial);
+      ornament.position.set(pos.x, 10, pos.z);
+      ornament.castShadow = true;
+      this.templeGroup.add(ornament);
+    });
+    
+    // Add golden lyre emblem above entrance
+    const lyreGroup = new THREE.Group();
+    
+    // Lyre body
+    const lyreBodyGeometry = new THREE.CylinderGeometry(0.6, 0.8, 1.2, 16, 1, false, 0, Math.PI);
+    const lyreBody = new THREE.Mesh(lyreBodyGeometry, goldMaterial);
     lyreBody.rotation.y = Math.PI;
     lyreGroup.add(lyreBody);
     
     // Lyre arms
-    const lyreArmGeometry = new THREE.TorusGeometry(0.15, 0.03, 8, 12, Math.PI);
+    const lyreArmGeometry = new THREE.TorusGeometry(0.5, 0.1, 8, 12, Math.PI);
     
     // Right arm
-    const lyreRightArm = new THREE.Mesh(lyreArmGeometry, lyreBodyMaterial);
-    lyreRightArm.position.x = 0.15;
+    const lyreRightArm = new THREE.Mesh(lyreArmGeometry, goldMaterial);
+    lyreRightArm.position.x = 0.5;
     lyreRightArm.rotation.y = Math.PI / 2;
     lyreGroup.add(lyreRightArm);
     
     // Left arm
-    const lyreLeftArm = new THREE.Mesh(lyreArmGeometry, lyreBodyMaterial);
-    lyreLeftArm.position.x = -0.15;
+    const lyreLeftArm = new THREE.Mesh(lyreArmGeometry, goldMaterial);
+    lyreLeftArm.position.x = -0.5;
     lyreLeftArm.rotation.y = -Math.PI / 2;
     lyreGroup.add(lyreLeftArm);
     
-    // Position lyre in hand
-    lyreGroup.position.set(1.1, 1.9, 0.2);
-    lyreGroup.rotation.x = Math.PI / 2;
-    lyreGroup.rotation.z = -Math.PI / 4;
-    statueGroup.add(lyreGroup);
+    // Add strings
+    for (let i = 0; i < 7; i++) {
+      const x = -0.45 + i * 0.15;
+      const stringGeometry = new THREE.CylinderGeometry(0.02, 0.02, 1, 4);
+      const string = new THREE.Mesh(stringGeometry, goldMaterial);
+      string.position.set(x, 0.5, 0);
+      lyreGroup.add(string);
+    }
     
-    // Create laurel wreath
-    const laurelGeometry = new THREE.TorusGeometry(0.4, 0.05, 8, 16);
-    const laurelMaterial = new THREE.MeshStandardMaterial({
-      color: 0xd4af37,
-      map: goldTexture,
-      roughness: 0.3,
-      metalness: 0.8
-    });
-    const laurel = new THREE.Mesh(laurelGeometry, laurelMaterial);
-    laurel.position.y = 2.8; // Position around head
-    laurel.rotation.x = Math.PI / 2;
-    statueGroup.add(laurel);
-    
-    // Position statue
-    statueGroup.position.set(0, 1.5 + groundY, -2);
-    statueGroup.scale.set(1.5, 1.5, 1.5);
-    this.templeGroup.add(statueGroup);
-    
-    return statueGroup;
-  }
-
-  createInstrumentDisplays(marbleTexture, goldTexture, groundY = 0) {
-    // Get instrument managers if available
-    const stringedManager = window.stringedManager || null;
-    const windManager = window.windManager || null;
-    const percussionManager = window.percussionManager || null;
-    
-    const displayPositions = [
-      { x: -6, z: -2, rotation: Math.PI / 4 },
-      { x: -6, z: 3, rotation: Math.PI / 4 },
-      { x: 6, z: -2, rotation: -Math.PI / 4 },
-      { x: 6, z: 3, rotation: -Math.PI / 4 }
-    ];
-    
-    displayPositions.forEach((pos, index) => {
-      const display = this.createInstrumentDisplay(index, marbleTexture, goldTexture, stringedManager, windManager, percussionManager);
-      display.position.set(pos.x, 1.5 + groundY, pos.z); // Adjust for ground height
-      display.rotation.y = pos.rotation;
-      this.templeGroup.add(display);
-    });
+    // Position the lyre above the entrance
+    lyreGroup.position.set(0, 9, 8.2);
+    lyreGroup.scale.set(2, 2, 2);
+    this.templeGroup.add(lyreGroup);
   }
   
-  createInstrumentDisplay(index, marbleTexture, goldTexture, stringedManager, windManager, percussionManager) {
-    const displayGroup = new THREE.Group();
+  createTempleInterior(marbleTexture) {
+    // Create simple interior for viewing from outside
+    const floorGeometry = new THREE.PlaneGeometry(18, 13);
+    const floorMaterial = new THREE.MeshStandardMaterial({
+      color: 0xcccccc,
+      map: marbleTexture,
+      roughness: 0.3,
+      metalness: 0.1
+    });
     
-    // Create pedestal
-    const pedestalGeometry = new THREE.CylinderGeometry(0.5, 0.6, 1, 16);
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 1.6;
+    floor.receiveShadow = true;
+    this.templeGroup.add(floor);
+    
+    // Add a pedestal with a glowing orb in the center of the temple
+    const pedestalGeometry = new THREE.CylinderGeometry(1, 1.2, 1, 16);
     const pedestalMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: marbleTexture,
       roughness: 0.5,
       metalness: 0.1
     });
+    
     const pedestal = new THREE.Mesh(pedestalGeometry, pedestalMaterial);
-    pedestal.position.y = 0.5; // Half height above ground
+    pedestal.position.set(0, 2.1, 0);
     pedestal.castShadow = true;
     pedestal.receiveShadow = true;
-    displayGroup.add(pedestal);
+    this.templeGroup.add(pedestal);
     
-    // Create different instruments based on index
-    let instrument;
-    switch(index) {
-      case 0:
-        // Lyre
-        instrument = stringedManager ? 
-          stringedManager.createLyre() : 
-          this.createSimpleInstrumentModel(0.3, 0.3, 0.3, 0xd2b48c);
-        instrument.position.y = 1.3; // Position on top of pedestal
-        instrument.scale.set(0.3, 0.3, 0.3);
-        break;
-      case 1:
-        // Aulos
-        instrument = windManager ? 
-          windManager.createAulos() : 
-          this.createSimpleInstrumentModel(0.1, 1.0, 0.1, 0xd2b48c);
-        instrument.position.y = 1.2; // Position on top of pedestal
-        instrument.scale.set(0.5, 0.5, 0.5);
-        break;
-      case 2:
-        // Kithara
-        instrument = stringedManager ? 
-          stringedManager.createKithara() : 
-          this.createSimpleInstrumentModel(0.5, 0.8, 0.2, 0xd2b48c);
-        instrument.position.y = 1.3; // Position on top of pedestal
-        instrument.scale.set(0.3, 0.3, 0.3);
-        break;
-      case 3:
-        // Syrinx (Pan Flute)
-        instrument = windManager ? 
-          windManager.createSyrinx() : 
-          this.createSimpleInstrumentModel(0.4, 0.4, 0.1, 0xd2b48c);
-        instrument.position.y = 1.2; // Position on top of pedestal
-        instrument.scale.set(0.5, 0.5, 0.5);
-        break;
-    }
-    
-    displayGroup.add(instrument);
-    
-    // Add spotlight to highlight the instrument
-    const spotlight = new THREE.SpotLight(0xffffcc, 0.5, 5, Math.PI / 6, 0.5, 2);
-    spotlight.position.set(0, 3, 0);
-    spotlight.target = instrument;
-    displayGroup.add(spotlight);
-    
-    return displayGroup;
-  }
-  
-  createSimpleInstrumentModel(width, height, depth, color) {
-    // Simple stand-in instrument if specialized managers aren't available
-    const geometry = new THREE.BoxGeometry(width, height, depth);
-    const material = new THREE.MeshStandardMaterial({
-      color: color,
-      roughness: 0.7,
-      metalness: 0.1
+    // Glowing orb
+    const orbGeometry = new THREE.SphereGeometry(1, 32, 32);
+    const orbMaterial = new THREE.MeshStandardMaterial({
+      color: 0x88ccff,
+      emissive: 0x4488ff,
+      emissiveIntensity: 1,
+      transparent: true,
+      opacity: 0.8,
+      roughness: 0.1,
+      metalness: 0.9
     });
-    return new THREE.Mesh(geometry, material);
-  }
-  
-  createTempleKeeper(groundY = 0) {
-    const keeperGroup = new THREE.Group();
     
-    // Create body
-    const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.4, 1.5, 8);
-    const bodyMaterial = new THREE.MeshStandardMaterial({
-      color: 0xf5f5dc,
-      roughness: 0.7,
-      metalness: 0.1
-    });
-    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.position.y = 0.75; // Half height above ground
-    body.castShadow = true;
-    keeperGroup.add(body);
+    const orb = new THREE.Mesh(orbGeometry, orbMaterial);
+    orb.position.set(0, 3.5, 0);
+    this.templeGroup.add(orb);
     
-    // Create head
-    const headGeometry = new THREE.SphereGeometry(0.25, 16, 16);
-    const headMaterial = new THREE.MeshStandardMaterial({
-      color: 0xedc9af,
-      roughness: 0.7,
-      metalness: 0.1
-    });
-    const head = new THREE.Mesh(headGeometry, headMaterial);
-    head.position.y = 1.65; // Position on top of body
-    head.castShadow = true;
-    keeperGroup.add(head);
+    // Add pulsing light inside orb
+    const orbLight = new THREE.PointLight(0x88ccff, 2, 15);
+    orbLight.position.copy(orb.position);
+    this.templeGroup.add(orbLight);
     
-    // Create hair
-    const hairGeometry = new THREE.SphereGeometry(0.28, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-    const hairMaterial = new THREE.MeshStandardMaterial({
-      color: 0xd3d3d3,
-      roughness: 0.9,
-      metalness: 0.1
-    });
-    const hair = new THREE.Mesh(hairGeometry, hairMaterial);
-    hair.position.y = 1.75; // Position on top of head
-    hair.rotation.x = Math.PI;
-    hair.castShadow = true;
-    keeperGroup.add(hair);
-    
-    // Create arms
-    const armGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.7, 8);
-    
-    // Right arm
-    const rightArm = new THREE.Mesh(armGeometry, bodyMaterial);
-    rightArm.position.set(0.3, 1.2, 0);
-    rightArm.rotation.z = -Math.PI / 4;
-    rightArm.castShadow = true;
-    keeperGroup.add(rightArm);
-    
-    // Left arm (holding scroll)
-    const leftArm = new THREE.Mesh(armGeometry, bodyMaterial);
-    leftArm.position.set(-0.3, 1.2, 0);
-    leftArm.rotation.z = Math.PI / 3;
-    leftArm.castShadow = true;
-    keeperGroup.add(leftArm);
-    
-    // Create scroll in hand
-    const scrollGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.4, 16);
-    const scrollMaterial = new THREE.MeshStandardMaterial({
-      color: 0xf5f5dc,
-      roughness: 0.9,
-      metalness: 0.1
-    });
-    const scroll = new THREE.Mesh(scrollGeometry, scrollMaterial);
-    scroll.position.set(-0.6, 1.3, 0);
-    scroll.rotation.z = Math.PI / 2;
-    scroll.castShadow = true;
-    keeperGroup.add(scroll);
-    
-    // Position keeper
-    keeperGroup.position.set(0, 1.5 + groundY, 6);
-    keeperGroup.rotation.y = Math.PI;
-    this.templeGroup.add(keeperGroup);
-    
-    // Add to interactive objects
-    this.playerController.addInteractiveObject({
-      mesh: keeperGroup,
-      position: new THREE.Vector3(-40, groundY, -4), // Will be adjusted when added to scene
-      name: "Temple Keeper",
-      radius: 2,
-      interact: () => {
-        if (!this.questManager.getQuestState().talkedToKeeper) {
-          this.dialogManager.showDialog("Temple Keeper", "I see you have found our temple, traveler. The instruments inside are sacred to Apollo and the Muses. They represent the harmony of the cosmos. Would you like to enter and examine them more closely?");
-          this.questManager.setTalkedToKeeper(true);
-        } else {
-          this.dialogManager.showDialog("Temple Keeper", "Go ahead inside. The instruments await your curiosity. Feel free to interact with them to learn their stories.");
-        }
+    // Add animation data for the orb
+    orb.userData = {
+      update: (time) => {
+        // Pulsing size
+        const scale = 1 + Math.sin(time * 0.001) * 0.1;
+        orb.scale.set(scale, scale, scale);
+        
+        // Pulsing light intensity
+        orbLight.intensity = 1.5 + Math.sin(time * 0.001) * 0.5;
+        
+        // Subtle floating motion
+        orb.position.y = 3.5 + Math.sin(time * 0.0005) * 0.2;
       }
-    });
+    };
     
-    return keeperGroup;
+    // Add some columns inside the temple
+    const innerColumnPositions = [
+      { x: -6, z: -4 },
+      { x: 6, z: -4 },
+      { x: -6, z: 4 },
+      { x: 6, z: 4 }
+    ];
+    
+    innerColumnPositions.forEach(pos => {
+      const column = this.createColumn(6, marbleTexture);
+      column.position.set(pos.x, 1.5, pos.z);
+      column.scale.set(0.8, 0.8, 0.8);
+      this.templeGroup.add(column);
+    });
   }
   
   addTempleLighting() {
-    // Add lighting to emphasize the temple
-    const templeLight = new THREE.SpotLight(0xffffcc, 0.8, 50, Math.PI / 6, 0.5, 2);
-    templeLight.position.set(0, 30, 0);
-    templeLight.target = this.templeGroup.children[0]; // Target the platform
-    templeLight.castShadow = true;
-    this.templeGroup.add(templeLight);
+    // Add dramatic lighting to the temple area
+    
+    // Main light beam from above
+    const templeSpotlight = new THREE.SpotLight(0xffffcc, 1.5, 50, Math.PI / 6, 0.5, 1);
+    templeSpotlight.position.set(0, 20, 0);
+    templeSpotlight.target = this.templeGroup;
+    templeSpotlight.castShadow = true;
+    this.templeGroup.add(templeSpotlight);
+    
+    // Add volumetric light beam
+    const beamGeometry = new THREE.CylinderGeometry(0.5, 3, 20, 16, 1, true);
+    const beamMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffdd,
+      transparent: true,
+      opacity: 0.2,
+      side: THREE.DoubleSide
+    });
+    
+    const lightBeam = new THREE.Mesh(beamGeometry, beamMaterial);
+    lightBeam.position.set(0, 10, 0);
+    this.templeGroup.add(lightBeam);
+    
+    // Add secondary lighting around the temple
+    const secondaryLights = [
+      { position: new THREE.Vector3(-15, 5, -15), color: 0x88aaff, intensity: 1 },
+      { position: new THREE.Vector3(15, 5, -15), color: 0x88aaff, intensity: 1 },
+      { position: new THREE.Vector3(0, 5, 15), color: 0xffffaa, intensity: 1.5 }
+    ];
+    
+    secondaryLights.forEach(light => {
+      const pointLight = new THREE.PointLight(light.color, light.intensity, 30);
+      pointLight.position.copy(light.position);
+      this.templeGroup.add(pointLight);
+    });
+    
+    // Add ambient lighting to ensure visibility
+    const ambientLight = new THREE.AmbientLight(0x445577, 0.5);
+    this.templeGroup.add(ambientLight);
+  }
+  
+  addAtmosphericEffects() {
+    // Add mist/fog around the floating island
+    const mistParticleCount = 200;
+    const mistGeometry = new THREE.BufferGeometry();
+    const mistPositions = new Float32Array(mistParticleCount * 3);
+    
+    for (let i = 0; i < mistParticleCount; i++) {
+      const i3 = i * 3;
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 20 + Math.random() * 10;
+      
+      mistPositions[i3] = Math.cos(angle) * radius;
+      mistPositions[i3 + 1] = -2 - Math.random() * 8;
+      mistPositions[i3 + 2] = Math.sin(angle) * radius;
+    }
+    
+    mistGeometry.setAttribute('position', new THREE.BufferAttribute(mistPositions, 3));
+    
+    const mistMaterial = new THREE.PointsMaterial({
+      color: 0xaabbff,
+      size: 1.5,
+      transparent: true,
+      opacity: 0.5,
+      sizeAttenuation: true
+    });
+    
+    const mistParticles = new THREE.Points(mistGeometry, mistMaterial);
+    
+    // Add animation data for mist
+    mistParticles.userData = {
+      initialPositions: mistPositions.slice(),
+      update: (time) => {
+        const positions = mistParticles.geometry.attributes.position.array;
+        for (let i = 0; i < mistParticleCount; i++) {
+          const i3 = i * 3;
+          
+          // Gentle swirling motion
+          const angle = Math.atan2(positions[i3 + 2], positions[i3]);
+          const radius = Math.sqrt(positions[i3] * positions[i3] + positions[i3 + 2] * positions[i3 + 2]);
+          
+          // Update angle for swirling
+          const newAngle = angle + 0.0005 * Math.sin(time * 0.0001 + i * 0.01);
+          
+          positions[i3] = Math.cos(newAngle) * radius;
+          positions[i3 + 2] = Math.sin(newAngle) * radius;
+          
+          // Gentle vertical oscillation
+          positions[i3 + 1] = mistParticles.userData.initialPositions[i3 + 1] + 
+                             Math.sin(time * 0.0005 + i * 0.01) * 0.5;
+        }
+        mistParticles.geometry.attributes.position.needsUpdate = true;
+      }
+    };
+    
+    this.templeGroup.add(mistParticles);
+    
+    // Add floating sparkles near the temple
+    const sparkleCount = 50;
+    const sparkleGeometry = new THREE.BufferGeometry();
+    const sparklePositions = new Float32Array(sparkleCount * 3);
+    
+    for (let i = 0; i < sparkleCount; i++) {
+      const i3 = i * 3;
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * 15;
+      
+      sparklePositions[i3] = Math.cos(angle) * radius;
+      sparklePositions[i3 + 1] = 3 + Math.random() * 8;
+      sparklePositions[i3 + 2] = Math.sin(angle) * radius;
+    }
+    
+    sparkleGeometry.setAttribute('position', new THREE.BufferAttribute(sparklePositions, 3));
+    
+    const sparkleMaterial = new THREE.PointsMaterial({
+      color: 0xffffdd,
+      size: 0.3,
+      transparent: true,
+      opacity: 0.8,
+      sizeAttenuation: true
+    });
+    
+    const sparkleParticles = new THREE.Points(sparkleGeometry, sparkleMaterial);
+    
+    // Add animation data for sparkles
+    sparkleParticles.userData = {
+      initialPositions: sparklePositions.slice(),
+      update: (time) => {
+        const positions = sparkleParticles.geometry.attributes.position.array;
+        for (let i = 0; i < sparkleCount; i++) {
+          const i3 = i * 3;
+          
+          // Gentle floating motion
+          positions[i3] = sparkleParticles.userData.initialPositions[i3] + 
+                         Math.sin(time * 0.001 + i) * 0.2;
+          positions[i3 + 1] = sparkleParticles.userData.initialPositions[i3 + 1] + 
+                             Math.cos(time * 0.001 + i) * 0.2;
+          positions[i3 + 2] = sparkleParticles.userData.initialPositions[i3 + 2] + 
+                             Math.sin(time * 0.001 + i * 0.5) * 0.2;
+        }
+        sparkleParticles.geometry.attributes.position.needsUpdate = true;
+        
+        // Pulse the opacity for twinkling effect
+        sparkleMaterial.opacity = 0.5 + Math.sin(time * 0.003) * 0.3;
+      }
+    };
+    
+    this.templeGroup.add(sparkleParticles);
+  }
+  
+  createPortalTrigger(templeX, templeY, templeZ) {
+    // Create a trigger area in front of the temple entrance to redirect to temple.html
+    const portalPosition = new THREE.Vector3(
+      templeX,
+      templeY,
+      templeZ + 8 // Position in front of temple entrance
+    );
+    
+    // Add an invisible trigger box
+    const portalGeometry = new THREE.BoxGeometry(4, 3, 1);
+    const portalMaterial = new THREE.MeshBasicMaterial({
+      color: 0x0000ff,
+      transparent: true,
+      opacity: 0.0 // Invisible
+    });
+    
+    this.portalTrigger = new THREE.Mesh(portalGeometry, portalMaterial);
+    this.portalTrigger.position.copy(portalPosition);
+    this.scene.add(this.portalTrigger);
+    
+    // Create visual effect for the portal
+    const portalEffectGeometry = new THREE.TorusGeometry(2, 0.2, 16, 32);
+    const portalEffectMaterial = new THREE.MeshBasicMaterial({
+      color: 0x88ccff,
+      transparent: true,
+      opacity: 0.7
+    });
+    
+    const portalEffect = new THREE.Mesh(portalEffectGeometry, portalEffectMaterial);
+    portalEffect.position.copy(portalPosition);
+    portalEffect.rotation.y = Math.PI / 2;
+    this.scene.add(portalEffect);
+    
+    // Add point light inside portal
+    const portalLight = new THREE.PointLight(0x88ccff, 2, 10);
+    portalLight.position.copy(portalPosition);
+    this.scene.add(portalLight);
+    
+    // Add animation data for portal effect
+    portalEffect.userData = {
+      update: (time) => {
+        // Pulsing size
+        const scale = 1 + Math.sin(time * 0.002) * 0.1;
+        portalEffect.scale.set(scale, scale, 1);
+        
+        // Rotation effect
+        portalEffect.rotation.z = time * 0.001;
+        
+        // Pulsing light
+        portalLight.intensity = 1.5 + Math.sin(time * 0.002) * 0.5;
+      }
+    };
+    
+    // Add to interactive objects for player detection
+    this.playerController.addInteractiveObject({
+      object: this.portalTrigger,
+      position: portalPosition,
+      name: "Temple Entrance",
+      radius: 4,
+      interact: () => {
+        // First show a dialog
+        this.dialogManager.showDialog("Temple Guardian Voice", "You have reached the sacred Temple of Apollo. Enter to explore the ancient musical instruments of the gods.");
+        
+        // Then redirect to temple.html after dialog is closed
+        setTimeout(() => {
+          // Check if dialog is closed before redirecting
+          if (!this.dialogManager.isOpen()) {
+            window.location.href = 'temple.html';
+          } else {
+            // Set up an event listener for when dialog is closed
+            const checkDialogClosed = setInterval(() => {
+              if (!this.dialogManager.isOpen()) {
+                clearInterval(checkDialogClosed);
+                window.location.href = 'temple.html';
+              }
+            }, 500);
+          }
+        }, 2000);
+      }
+    });
+    
+    // Update quest state when the temple is found
+    this.questManager.setTempleFound(true);
+  }
+  
+  // Animation update method to be called in the main game loop
+  update(time) {
+    // Update any animated elements in the temple
+    if (this.templeGroup) {
+      // Update floating crystals
+      this.islandGroup.children.forEach(child => {
+        if (child.userData && child.userData.update) {
+          child.userData.update(time);
+        }
+      });
+      
+      // Update orb and light beam
+      this.templeGroup.children.forEach(child => {
+        if (child.userData && child.userData.update) {
+          child.userData.update(time);
+        }
+      });
+      
+      // Update portal effect
+      if (this.portalTrigger && this.portalTrigger.userData && this.portalTrigger.userData.update) {
+        this.portalTrigger.userData.update(time);
+      }
+      
+      // Make the entire temple gently float
+      this.templeGroup.position.y = this.templeGroup.position.y + Math.sin(time * 0.0001) * 0.01;
+    }
   }
 }
