@@ -9,7 +9,7 @@ const CONFIG = {
     radius: 0.3,
     moveSpeed: 20.0,       // DRASTICALLY increased from 15.0
     sprintSpeed: 10.0,     // DRASTICALLY increased from 24.0
-    jumpStrength: 5.5,     
+    jumpStrength: 50.5,     
     gravity: 15.0,
     frictionCoef: 0.2,     // Further reduced friction for more responsive movement
     stepHeight: 0.35
