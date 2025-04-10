@@ -1,7 +1,7 @@
 /**
  * TemplesManager
- * Handles creation and management of the floating temple structure
- * with improved stair access
+ * Handles creation and management of the temple structure
+ * with properly connected stairs
  */
 class TemplesManager {
   constructor(scene, textureEngine, collisionManager, playerController, questManager, dialogManager) {
@@ -27,35 +27,34 @@ class TemplesManager {
     // Get textures from texture engine
     const { marbleTexture, goldTexture, roofTileTexture, stoneTexture } = this.textureEngine.getTextures();
     
-    // Position the entire temple complex
-    const templeX = -40;
-    const templeY = 20; // Lower height for better accessibility
-    const templeZ = -10;
+    // Position variables - keep island position fixed first
+    const islandX = -40;
+    const islandY = 15; // Lower height
+    const islandZ = -10;
     
-    // Create floating island
+    // Create island at origin first so we can get exact dimensions
     this.createFloatingIsland(stoneTexture);
     
-    // Create accessible staircase
-    this.createAccessibleStaircase(marbleTexture, templeX, templeY, templeZ);
+    // Position the island (this doesn't move the actual geometry yet)
+    this.islandGroup.position.set(islandX, islandY, islandZ);
+    this.scene.add(this.islandGroup);
     
-    // Create temple on the island
+    // Create temple on the island (positioned relative to island)
     this.createTempleStructure(marbleTexture, goldTexture, roofTileTexture);
-    
-    // Create lighting and atmosphere
-    this.addTempleLighting();
-    this.addAtmosphericEffects();
-    
-    this.templeGroup.position.set(templeX, templeY, templeZ);
+    this.templeGroup.position.set(islandX, islandY, islandZ);
     this.scene.add(this.templeGroup);
     
+    // Now create solid stairs from ground to island
+    this.createSolidStaircase(marbleTexture, islandX, islandY, islandZ);
+    
     // Create portal trigger at the temple entrance
-    this.createPortalTrigger(templeX, templeY, templeZ);
+    this.createPortalTrigger(islandX, islandY, islandZ);
     
     // Add visual quest marker
-    this.questManager.createQuestMarker(new THREE.Vector3(templeX, templeY + 15, templeZ - 6));
+    this.questManager.createQuestMarker(new THREE.Vector3(islandX, islandY + 15, islandZ - 6));
     
-    // Create starting teleporter for easier access
-    this.createGroundTeleporter(templeX, templeZ);
+    // Create lighting and effects
+    this.addTempleLighting();
     
     return this.templeGroup;
   }
@@ -63,10 +62,10 @@ class TemplesManager {
   createFloatingIsland(stoneTexture) {
     // Create a circular island base
     const islandRadius = 25;
-    const islandHeight = 10;
+    const islandHeight = 5;
     
-    // Main island mass
-    const islandGeometry = new THREE.CylinderGeometry(islandRadius, islandRadius * 1.2, islandHeight, 32);
+    // Main island mass - using BoxGeometry for stability and better collisions
+    const islandGeometry = new THREE.BoxGeometry(islandRadius * 2, islandHeight, islandRadius * 2);
     const islandMaterial = new THREE.MeshStandardMaterial({
       map: stoneTexture,
       roughness: 0.8,
@@ -75,282 +74,250 @@ class TemplesManager {
     });
     
     const islandMesh = new THREE.Mesh(islandGeometry, islandMaterial);
+    // Center vertically so top is at y=0 for easier alignment
     islandMesh.position.y = -islandHeight/2;
     islandMesh.castShadow = true;
     islandMesh.receiveShadow = true;
     this.islandGroup.add(islandMesh);
     
-    // Add rock formations around the edge
-    for (let i = 0; i < 18; i++) {
-      const angle = (i / 18) * Math.PI * 2;
-      const radius = islandRadius * 0.9;
-      
-      const rockHeight = 2 + Math.random() * 3;
-      const rockGeometry = new THREE.ConeGeometry(
-        1 + Math.random(), 
-        rockHeight, 
-        5 + Math.floor(Math.random() * 3)
-      );
-      
-      const rockMaterial = new THREE.MeshStandardMaterial({
-        map: stoneTexture,
-        color: 0x7a8a7a,
-        roughness: 0.9,
-        metalness: 0.1
-      });
-      
-      const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-      rock.position.set(
-        Math.cos(angle) * radius,
-        rockHeight/2,
-        Math.sin(angle) * radius
-      );
-      rock.rotation.y = Math.random() * Math.PI;
-      rock.castShadow = true;
-      rock.receiveShadow = true;
-      this.islandGroup.add(rock);
-    }
-    
-    // Add ground surface on top of the island
-    const surfaceGeometry = new THREE.CircleGeometry(islandRadius * 0.95, 32);
+    // Add top surface with different material
+    const surfaceGeometry = new THREE.BoxGeometry(islandRadius * 2, 0.5, islandRadius * 2);
     const surfaceMaterial = new THREE.MeshStandardMaterial({
       color: 0x91a185,
       roughness: 0.8,
-      metalness: 0.1
+      metalness: 0.1,
+      map: stoneTexture
     });
     
     const surface = new THREE.Mesh(surfaceGeometry, surfaceMaterial);
-    surface.rotation.x = -Math.PI / 2;
-    surface.position.y = 0.1;
+    surface.position.y = 0.25; // Half its height above island
     surface.receiveShadow = true;
     this.islandGroup.add(surface);
     
-    // Add some vegetation and small details
-    this.addIslandVegetation();
-    
-    // Add floating crystal formations for mystical effect
-    this.addFloatingCrystals();
-    
-    // Add collision for the island surface
-    this.collisionManager.addCollider({
-      position: new THREE.Vector3(this.templeGroup.position.x, this.templeGroup.position.y, this.templeGroup.position.z),
+    // Save island dimensions for reference
+    this.islandDimensions = {
       radius: islandRadius,
-      type: 'cylinder',
-      height: 0.2
-    });
+      height: islandHeight,
+      top: 0.5 // Height of the top surface
+    };
     
-    this.templeGroup.add(this.islandGroup);
+    return this.islandGroup;
   }
   
-  addIslandVegetation() {
-    // Add small bushes and plants
-    const bushGeometry = new THREE.SphereGeometry(0.5, 8, 8);
-    const bushMaterial = new THREE.MeshStandardMaterial({
-      color: 0x4a6d4a,
-      roughness: 0.9
+  createSolidStaircase(marbleTexture, islandX, islandY, islandZ) {
+    // Create a solid staircase leading up to the island
+    // Plan: Create a direct staircase from ground (y=0) to island surface (y=islandY)
+    
+    // Stair configuration
+    const stairStartZ = islandZ + 35; // Start further away from island center
+    const stairEndZ = islandZ + this.islandDimensions.radius * 0.8; // End at edge of island
+    
+    const stairWidth = 8;
+    const stepCount = 30; // Enough steps to make a reasonable slope
+    
+    // Calculate step dimensions
+    const totalRise = islandY; // Vertical distance
+    const totalRun = stairStartZ - stairEndZ; // Horizontal distance
+    
+    const stepRise = totalRise / stepCount; // Height of each step
+    const stepRun = totalRun / stepCount; // Depth of each step
+    
+    // Create a solid base structure for the entire staircase
+    const baseGeometry = new THREE.BoxGeometry(
+      stairWidth, 
+      islandY / 2, // Half the height of the island
+      totalRun 
+    );
+    
+    const baseMaterial = new THREE.MeshStandardMaterial({
+      color: 0x777777,
+      roughness: 0.9,
+      metalness: 0.1
     });
     
-    for (let i = 0; i < 25; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const radius = 10 + Math.random() * 12;
-      
-      const bush = new THREE.Mesh(bushGeometry, bushMaterial);
-      bush.position.set(
-        Math.cos(angle) * radius,
-        0.3,
-        Math.sin(angle) * radius
-      );
-      bush.scale.set(
-        0.5 + Math.random() * 0.5,
-        0.5 + Math.random() * 0.5,
-        0.5 + Math.random() * 0.5
-      );
-      bush.castShadow = true;
-      bush.receiveShadow = true;
-      this.islandGroup.add(bush);
-    }
+    const stairBase = new THREE.Mesh(baseGeometry, baseMaterial);
     
-    // Add flower patches
-    const flowerColors = [0xe7493a, 0xffeb3b, 0xf5b8d1, 0xe91e63, 0xffffff];
-    for (let i = 0; i < 40; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const radius = 8 + Math.random() * 14;
-      
-      const flowerGeometry = new THREE.SphereGeometry(0.15, 8, 8);
-      const flowerMaterial = new THREE.MeshStandardMaterial({
-        color: flowerColors[Math.floor(Math.random() * flowerColors.length)],
-        roughness: 0.8,
-        metalness: 0.1
-      });
-      
-      const flower = new THREE.Mesh(flowerGeometry, flowerMaterial);
-      flower.position.set(
-        Math.cos(angle) * radius,
-        0.2,
-        Math.sin(angle) * radius
-      );
-      this.islandGroup.add(flower);
-      
-      // Add stem
-      const stemGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.2, 4);
-      const stemMaterial = new THREE.MeshStandardMaterial({
-        color: 0x2e7d32,
-        roughness: 0.9
-      });
-      
-      const stem = new THREE.Mesh(stemGeometry, stemMaterial);
-      stem.position.set(
-        Math.cos(angle) * radius,
-        0.1,
-        Math.sin(angle) * radius
-      );
-      this.islandGroup.add(stem);
-    }
-  }
-  
-  addFloatingCrystals() {
-    const crystalGeometry = new THREE.ConeGeometry(0.5, 2, 5);
-    const crystalMaterial = new THREE.MeshStandardMaterial({
-      color: 0x88aaff,
-      transparent: true,
-      opacity: 0.7,
-      roughness: 0.1,
-      metalness: 0.9
+    // Position the base so its top aligns with the ground
+    stairBase.position.set(
+      islandX, 
+      islandY / 4, // Center vertically (half of half height)
+      (stairStartZ + stairEndZ) / 2 // Center horizontally
+    );
+    
+    stairBase.castShadow = true;
+    stairBase.receiveShadow = true;
+    this.scene.add(stairBase);
+    
+    // Add collision for the base
+    this.collisionManager.addCollider({
+      position: new THREE.Vector3(
+        islandX,
+        islandY / 4,
+        (stairStartZ + stairEndZ) / 2
+      ),
+      radius: Math.max(stairWidth, totalRun) / 2,
+      type: 'box',
+      width: stairWidth,
+      height: islandY / 2,
+      depth: totalRun
     });
     
-    // Add floating crystals around the island
-    for (let i = 0; i < 12; i++) {
-      const angle = (i / 12) * Math.PI * 2;
-      const radius = 20;
-      
-      const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
-      crystal.position.set(
-        Math.cos(angle) * radius,
-        2 + Math.sin(i * 0.5) * 3,
-        Math.sin(angle) * radius
-      );
-      
-      // Rotate crystal to point outward
-      crystal.rotation.x = Math.PI;
-      crystal.rotation.y = angle;
-      
-      crystal.castShadow = true;
-      this.islandGroup.add(crystal);
-      
-      // Add point light inside crystal
-      const light = new THREE.PointLight(0x88aaff, 0.5, 5);
-      light.position.copy(crystal.position);
-      this.islandGroup.add(light);
-      
-      // Store animation data for floating motion
-      crystal.userData = {
-        initialY: crystal.position.y,
-        angle: i,
-        update: (time) => {
-          crystal.position.y = crystal.userData.initialY + Math.sin(time * 0.001 + i) * 0.5;
-          crystal.rotation.z = Math.sin(time * 0.0005 + i * 0.5) * 0.1;
-        }
-      };
-    }
-  }
-  
-  createAccessibleStaircase(marbleTexture, templeX, templeY, templeZ) {
-    // Create a solid, accessible staircase leading up to the island
-    const startY = 0; // Start at ground level
-    const endY = templeY; // End at temple height
-    
-    // The staircase will start at ground level below the temple
-    const startPoint = new THREE.Vector3(0, 0, 40); // Starting point on the ground
-    const endPoint = new THREE.Vector3(0, 0, 15);   // End point near the island's edge
-    
-    // Calculate stair parameters
-    const horizontalDistance = startPoint.z - endPoint.z;
-    const verticalDistance = endY;
-    const stepCount = 40; // More steps for easier climbing
-    
-    // Calculate dimensions for each step
-    const stepDepth = horizontalDistance / stepCount;
-    const stepHeight = verticalDistance / stepCount;
-    const stepWidth = 6; // Width of each step
-    
+    // Create individual steps on top of the base
     const stepMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: marbleTexture,
       roughness: 0.5,
       metalness: 0.1
     });
-
-    // Create individual steps
+    
+    // Create steps from ground up
     for (let i = 0; i < stepCount; i++) {
-      const stepGeometry = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth);
+      const stepGeometry = new THREE.BoxGeometry(stairWidth, stepRise, stepRun);
       const step = new THREE.Mesh(stepGeometry, stepMaterial);
       
-      // Position each step along the path from start to end
-      const z = startPoint.z - (i * stepDepth) - (stepDepth / 2);
-      const y = (i * stepHeight) + (stepHeight / 2);
+      // Position each step
+      step.position.set(
+        islandX,
+        i * stepRise + stepRise/2, // Bottom step starts at y=0
+        stairStartZ - (i * stepRun + stepRun/2) // Start from stairStartZ and move toward island
+      );
       
-      step.position.set(0, y, z);
       step.castShadow = true;
       step.receiveShadow = true;
-      this.stairsGroup.add(step);
+      this.scene.add(step);
       
       // Add collision for each step
       this.collisionManager.addCollider({
-        position: new THREE.Vector3(
-          templeX, 
-          stepHeight/2 + i * stepHeight, 
-          templeZ + z
-        ),
-        radius: Math.max(stepWidth, stepDepth) / 2,
+        position: step.position.clone(),
+        radius: Math.max(stairWidth, stepRun) / 2,
         type: 'box',
-        width: stepWidth,
-        height: stepHeight,
-        depth: stepDepth
+        width: stairWidth,
+        height: stepRise,
+        depth: stepRun
       });
     }
     
-    // Create side walls/railings to prevent falling
-    const railingHeight = 1;
-    const railingGeometry = new THREE.BoxGeometry(0.5, railingHeight, horizontalDistance);
+    // Create solid railings attached to the stairs
+    this.createStairRailings(
+      islandX, 
+      stairStartZ, 
+      stairEndZ, 
+      stairWidth, 
+      totalRise,
+      stepCount,
+      marbleTexture
+    );
+    
+    // Create a landing platform connecting stairs to island
+    this.createLandingPlatform(
+      islandX,
+      islandY,
+      stairEndZ,
+      stairWidth,
+      marbleTexture
+    );
+    
+    // Create a small platform at the ground level for the first step
+    const groundPlatformGeometry = new THREE.BoxGeometry(stairWidth + 4, 0.5, 4);
+    const groundPlatform = new THREE.Mesh(groundPlatformGeometry, stepMaterial);
+    groundPlatform.position.set(
+      islandX,
+      0.25, // Half height above ground
+      stairStartZ + 2 // Just before the first step
+    );
+    groundPlatform.receiveShadow = true;
+    this.scene.add(groundPlatform);
+    
+    // Add collision for ground platform
+    this.collisionManager.addCollider({
+      position: groundPlatform.position.clone(),
+      radius: Math.max(stairWidth + 4, 4) / 2,
+      type: 'box',
+      width: stairWidth + 4,
+      height: 0.5,
+      depth: 4
+    });
+    
+    return this.stairsGroup;
+  }
+  
+  createStairRailings(islandX, stairStartZ, stairEndZ, stairWidth, totalRise, stepCount, marbleTexture) {
+    // Create solid railings that properly follow the stair path
+    const railingHeight = 1.5;
+    const railingWidth = 0.5;
+    
     const railingMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
+      color: 0xdddddd,
       map: marbleTexture,
-      roughness: 0.5,
+      roughness: 0.6,
       metalness: 0.1
     });
     
-    // Left railing
+    // Calculate the angle of the stairs for angled railings
+    const stairAngle = Math.atan2(totalRise, stairStartZ - stairEndZ);
+    const railingLength = Math.sqrt(Math.pow(totalRise, 2) + Math.pow(stairStartZ - stairEndZ, 2));
+    
+    // Create angled railing base (follows stairs exactly)
+    const railingGeometry = new THREE.BoxGeometry(railingWidth, railingLength, railingWidth);
+    
+    // Left railing base
     const leftRailing = new THREE.Mesh(railingGeometry, railingMaterial);
-    leftRailing.position.set(-stepWidth/2 - 0.25, verticalDistance/2, (startPoint.z + endPoint.z)/2);
+    leftRailing.position.set(
+      islandX - stairWidth/2 - railingWidth/2,
+      totalRise/2,
+      (stairStartZ + stairEndZ)/2
+    );
+    
+    // Rotate the railing to follow stairs
+    leftRailing.rotation.x = Math.PI/2 - stairAngle;
     leftRailing.castShadow = true;
-    this.stairsGroup.add(leftRailing);
+    this.scene.add(leftRailing);
     
-    // Right railing
+    // Right railing base
     const rightRailing = new THREE.Mesh(railingGeometry, railingMaterial);
-    rightRailing.position.set(stepWidth/2 + 0.25, verticalDistance/2, (startPoint.z + endPoint.z)/2);
-    rightRailing.castShadow = true;
-    this.stairsGroup.add(rightRailing);
+    rightRailing.position.set(
+      islandX + stairWidth/2 + railingWidth/2,
+      totalRise/2,
+      (stairStartZ + stairEndZ)/2
+    );
     
-    // Add railing posts for aesthetic detail
-    for (let i = 0; i < 8; i++) {
-      const z = startPoint.z - (i * horizontalDistance / 7);
-      const postGeometry = new THREE.BoxGeometry(0.8, railingHeight * 2, 0.8);
+    // Rotate the railing to follow stairs
+    rightRailing.rotation.x = Math.PI/2 - stairAngle;
+    rightRailing.castShadow = true;
+    this.scene.add(rightRailing);
+    
+    // Add vertical posts for both railings
+    for (let i = 0; i <= stepCount; i += 5) { // Posts every 5 steps
+      const postHeight = railingHeight;
+      const postGeometry = new THREE.BoxGeometry(railingWidth, postHeight, railingWidth);
+      
+      // Calculate post position - proportional position along the stairs
+      const progress = i / stepCount;
+      const posZ = stairStartZ - progress * (stairStartZ - stairEndZ);
+      const posY = progress * totalRise + postHeight/2;
       
       // Left post
       const leftPost = new THREE.Mesh(postGeometry, railingMaterial);
-      leftPost.position.set(-stepWidth/2 - 0.25, railingHeight, z);
+      leftPost.position.set(
+        islandX - stairWidth/2 - railingWidth/2,
+        posY,
+        posZ
+      );
       leftPost.castShadow = true;
-      this.stairsGroup.add(leftPost);
+      this.scene.add(leftPost);
       
       // Right post
       const rightPost = new THREE.Mesh(postGeometry, railingMaterial);
-      rightPost.position.set(stepWidth/2 + 0.25, railingHeight, z);
+      rightPost.position.set(
+        islandX + stairWidth/2 + railingWidth/2,
+        posY,
+        posZ
+      );
       rightPost.castShadow = true;
-      this.stairsGroup.add(rightPost);
+      this.scene.add(rightPost);
       
-      // Add lanterns on some posts for lighting
-      if (i % 2 === 0) {
-        // Create lantern geometry
+      // Add lanterns to some posts
+      if (i % 10 === 0) {
         const lanternGeometry = new THREE.SphereGeometry(0.3, 8, 8);
         const lanternMaterial = new THREE.MeshStandardMaterial({
           color: 0xffffaa,
@@ -362,175 +329,122 @@ class TemplesManager {
         
         // Left lantern
         const leftLantern = new THREE.Mesh(lanternGeometry, lanternMaterial);
-        leftLantern.position.set(-stepWidth/2 - 0.25, railingHeight * 2, z);
-        this.stairsGroup.add(leftLantern);
+        leftLantern.position.set(
+          islandX - stairWidth/2 - railingWidth/2,
+          posY + postHeight/2,
+          posZ
+        );
+        this.scene.add(leftLantern);
         
         // Right lantern
         const rightLantern = new THREE.Mesh(lanternGeometry, lanternMaterial);
-        rightLantern.position.set(stepWidth/2 + 0.25, railingHeight * 2, z);
-        this.stairsGroup.add(rightLantern);
+        rightLantern.position.set(
+          islandX + stairWidth/2 + railingWidth/2,
+          posY + postHeight/2,
+          posZ
+        );
+        this.scene.add(rightLantern);
         
-        // Add light sources
+        // Add point lights
         const leftLight = new THREE.PointLight(0xffffaa, 0.7, 8);
         leftLight.position.copy(leftLantern.position);
-        this.stairsGroup.add(leftLight);
+        this.scene.add(leftLight);
         
         const rightLight = new THREE.PointLight(0xffffaa, 0.7, 8);
         rightLight.position.copy(rightLantern.position);
-        this.stairsGroup.add(rightLight);
+        this.scene.add(rightLight);
       }
     }
     
-    // Add a landing pad where stairs meet the island
-    const landingGeometry = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth * 2);
-    const landing = new THREE.Mesh(landingGeometry, stepMaterial);
-    landing.position.set(0, endY, endPoint.z - stepDepth);
-    landing.castShadow = true;
+    // Add horizontal top rails for more detail
+    const topRailGeometry = new THREE.BoxGeometry(railingWidth, railingWidth, stairStartZ - stairEndZ);
+    
+    // Left top rail
+    const leftTopRail = new THREE.Mesh(topRailGeometry, railingMaterial);
+    leftTopRail.position.set(
+      islandX - stairWidth/2 - railingWidth/2,
+      railingHeight,
+      (stairStartZ + stairEndZ)/2
+    );
+    leftTopRail.castShadow = true;
+    this.scene.add(leftTopRail);
+    
+    // Right top rail
+    const rightTopRail = new THREE.Mesh(topRailGeometry, railingMaterial);
+    rightTopRail.position.set(
+      islandX + stairWidth/2 + railingWidth/2,
+      railingHeight,
+      (stairStartZ + stairEndZ)/2
+    );
+    rightTopRail.castShadow = true;
+    this.scene.add(rightTopRail);
+  }
+  
+  createLandingPlatform(islandX, islandY, stairEndZ, stairWidth, marbleTexture) {
+    // Create a landing platform that connects the stairs to the island
+    const landingWidth = stairWidth;
+    const landingDepth = 4;
+    const landingHeight = 0.5;
+    
+    const landingGeometry = new THREE.BoxGeometry(landingWidth, landingHeight, landingDepth);
+    const landingMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: marbleTexture,
+      roughness: 0.5,
+      metalness: 0.1
+    });
+    
+    const landing = new THREE.Mesh(landingGeometry, landingMaterial);
+    landing.position.set(
+      islandX,
+      islandY, // Same height as island surface
+      stairEndZ - landingDepth/2 // Position to connect with stairs
+    );
     landing.receiveShadow = true;
-    this.stairsGroup.add(landing);
+    this.scene.add(landing);
     
     // Add collision for landing
     this.collisionManager.addCollider({
-      position: new THREE.Vector3(
-        templeX, 
-        templeY, 
-        templeZ + endPoint.z - stepDepth
-      ),
-      radius: Math.max(stepWidth, stepDepth * 2) / 2,
+      position: landing.position.clone(),
+      radius: Math.max(landingWidth, landingDepth) / 2,
       type: 'box',
-      width: stepWidth,
-      height: stepHeight,
-      depth: stepDepth * 2
+      width: landingWidth,
+      height: landingHeight,
+      depth: landingDepth
     });
     
-    this.templeGroup.add(this.stairsGroup);
+    // Add small decorative columns at landing corners
+    const columnHeight = 1.8;
+    const columnRadius = 0.3;
+    const columnGeometry = new THREE.CylinderGeometry(columnRadius, columnRadius, columnHeight, 8);
+    
+    const columnPositions = [
+      {x: landingWidth/2 - columnRadius, z: -landingDepth/2 + columnRadius},
+      {x: -landingWidth/2 + columnRadius, z: -landingDepth/2 + columnRadius}
+    ];
+    
+    columnPositions.forEach(pos => {
+      const column = new THREE.Mesh(columnGeometry, landingMaterial);
+      column.position.set(
+        islandX + pos.x,
+        islandY + columnHeight/2,
+        stairEndZ + pos.z
+      );
+      column.castShadow = true;
+      this.scene.add(column);
+      
+      // Add decorative top
+      const capGeometry = new THREE.BoxGeometry(columnRadius*2, columnRadius, columnRadius*2);
+      const cap = new THREE.Mesh(capGeometry, landingMaterial);
+      cap.position.set(
+        islandX + pos.x,
+        islandY + columnHeight + columnRadius/2,
+        stairEndZ + pos.z
+      );
+      cap.castShadow = true;
+      this.scene.add(cap);
+    });
   }
-  
-  createGroundTeleporter(templeX, templeZ) {
-    // Create a teleporter at ground level for instant access
-    const teleporterPosition = new THREE.Vector3(
-      templeX,
-      0.5, // Just above ground level
-      templeZ + 45 // At the base of the stairs
-    );
-    
-    // Visual effect for teleporter
-    const teleporterGeometry = new THREE.CylinderGeometry(3, 3, 0.1, 32);
-    const teleporterMaterial = new THREE.MeshStandardMaterial({
-      color: 0x88ccff,
-      emissive: 0x4488ff,
-      emissiveIntensity: 0.5,
-      transparent: true,
-      opacity: 0.7
-    });
-    
-    const teleporter = new THREE.Mesh(teleporterGeometry, teleporterMaterial);
-    teleporter.position.copy(teleporterPosition);
-    this.scene.add(teleporter);
-    
-    // Add point light for the teleporter
-    const teleporterLight = new THREE.PointLight(0x88ccff, 1.5, 10);
-    teleporterLight.position.copy(teleporterPosition);
-    teleporterLight.position.y += 0.5;
-    this.scene.add(teleporterLight);
-    
-    // Add animation data for teleporter
-    teleporter.userData = {
-      update: (time) => {
-        // Pulsing effect
-        teleporter.material.opacity = 0.4 + Math.sin(time * 0.003) * 0.3;
-        teleporterLight.intensity = 1 + Math.sin(time * 0.003) * 0.5;
-        
-        // Rotating effect
-        teleporter.rotation.y = time * 0.001;
-      }
-    };
-    
-    // Add to interactive objects for teleportation
-    this.playerController.addInteractiveObject({
-      object: teleporter,
-      position: teleporterPosition,
-      name: "Teleporter to Temple",
-      radius: 3,
-      interact: () => {
-        // Show dialog
-        this.dialogManager.showDialog("Mystic Voice", "The winds of Apollo lift you to the sacred temple...");
-        
-        // Teleport player to top of stairs
-        setTimeout(() => {
-          const landingPosition = new THREE.Vector3(
-            templeX,
-            this.templeGroup.position.y + 1.5, // Slightly above landing
-            templeZ + 15 // At the temple entrance
-          );
-          
-          this.playerController.setPosition(
-            landingPosition.x,
-            landingPosition.y,
-            landingPosition.z
-          );
-          
-          // Make player look at the temple
-          this.playerController.lookAt(new THREE.Vector3(templeX, landingPosition.y, templeZ));
-        }, 1500);
-      }
-    });
-    
-    // Add signpost explaining the teleporter and stairs
-    const signPost = this.createSignPost(
-      new THREE.Vector3(teleporterPosition.x + 5, 0.5, teleporterPosition.z),
-      "Temple Access", 
-      "Step into the glowing circle to teleport directly to the Temple of Apollo, or climb the grand staircase to approach with reverence."
-    );
-    this.scene.add(signPost);
-  }
-  
-  createSignPost(position, title, text) {
-    const signGroup = new THREE.Group();
-    
-    // Create post
-    const postGeometry = new THREE.CylinderGeometry(0.1, 0.1, 2, 8);
-    const postMaterial = new THREE.MeshStandardMaterial({
-      color: 0x8B4513,
-      roughness: 0.9
-    });
-    
-    const post = new THREE.Mesh(postGeometry, postMaterial);
-    post.position.y = 1;
-    signGroup.add(post);
-    
-    // Create sign board
-    const boardGeometry = new THREE.BoxGeometry(3, 1.5, 0.1);
-    const boardMaterial = new THREE.MeshStandardMaterial({
-      color: 0xd2b48c,
-      roughness: 0.8
-    });
-    
-    const board = new THREE.Mesh(boardGeometry, boardMaterial);
-    board.position.y = 2;
-    board.rotation.y = Math.PI / 4; // Angle for better visibility
-    signGroup.add(board);
-    
-    // Add interactive functionality
-    this.playerController.addInteractiveObject({
-      object: board,
-      position: new THREE.Vector3(position.x, position.y + 2, position.z),
-      name: title,
-      radius: 5,
-      interact: () => {
-        this.dialogManager.showDialog(title, text);
-      }
-    });
-    
-    // Position the sign
-    signGroup.position.copy(position);
-    
-    return signGroup;
-  }
-
-  
- 
-  
   
   createTempleStructure(marbleTexture, goldTexture, roofTileTexture) {
     // Create main temple structure on the island
@@ -623,7 +537,7 @@ class TemplesManager {
     // Create interior space
     this.createTempleInterior(marbleTexture);
     
-    // Add collider for the main temple structure
+    // Add collision for the main temple structure
     this.collisionManager.addCollider({
       position: new THREE.Vector3(
         this.templeGroup.position.x,
@@ -803,34 +717,6 @@ class TemplesManager {
     backPediment.rotation.y = Math.PI;
     backPediment.castShadow = true;
     this.templeGroup.add(backPediment);
-    
-    // Add decorative relief to front pediment
-    const sunGeometry = new THREE.CircleGeometry(1.5, 16);
-    const sunMaterial = new THREE.MeshStandardMaterial({
-      color: 0xfafafa,
-      roughness: 0.5,
-      metalness: 0.1
-    });
-    
-    const sun = new THREE.Mesh(sunGeometry, sunMaterial);
-    sun.position.set(0, 9, 8.1);
-    sun.castShadow = true;
-    this.templeGroup.add(sun);
-    
-    // Add rays around sun
-    for (let i = 0; i < 12; i++) {
-      const angle = (i / 12) * Math.PI * 2;
-      const rayGeometry = new THREE.BoxGeometry(0.2, 1, 0.05);
-      const ray = new THREE.Mesh(rayGeometry, sunMaterial);
-      
-      ray.position.set(
-        Math.cos(angle) * 2,
-        9 + Math.sin(angle) * 2,
-        8.15
-      );
-      ray.rotation.z = angle;
-      this.templeGroup.add(ray);
-    }
   }
   
   addGoldenAccents(goldTexture) {
@@ -987,162 +873,12 @@ class TemplesManager {
     });
   }
   
-  addTempleLighting() {
-    // Add dramatic lighting to the temple area
-    
-    // Main light beam from above
-    const templeSpotlight = new THREE.SpotLight(0xffffcc, 1.5, 50, Math.PI / 6, 0.5, 1);
-    templeSpotlight.position.set(0, 20, 0);
-    templeSpotlight.target = this.templeGroup;
-    templeSpotlight.castShadow = true;
-    this.templeGroup.add(templeSpotlight);
-    
-    // Add volumetric light beam
-    const beamGeometry = new THREE.CylinderGeometry(0.5, 3, 20, 16, 1, true);
-    const beamMaterial = new THREE.MeshBasicMaterial({
-      color: 0xffffdd,
-      transparent: true,
-      opacity: 0.2,
-      side: THREE.DoubleSide
-    });
-    
-    const lightBeam = new THREE.Mesh(beamGeometry, beamMaterial);
-    lightBeam.position.set(0, 10, 0);
-    this.templeGroup.add(lightBeam);
-    
-    // Add secondary lighting around the temple
-    const secondaryLights = [
-      { position: new THREE.Vector3(-15, 5, -15), color: 0x88aaff, intensity: 1 },
-      { position: new THREE.Vector3(15, 5, -15), color: 0x88aaff, intensity: 1 },
-      { position: new THREE.Vector3(0, 5, 15), color: 0xffffaa, intensity: 1.5 }
-    ];
-    
-    secondaryLights.forEach(light => {
-      const pointLight = new THREE.PointLight(light.color, light.intensity, 30);
-      pointLight.position.copy(light.position);
-      this.templeGroup.add(pointLight);
-    });
-    
-    // Add ambient lighting to ensure visibility
-    const ambientLight = new THREE.AmbientLight(0x445577, 0.5);
-    this.templeGroup.add(ambientLight);
-  }
-  
-  addAtmosphericEffects() {
-    // Add mist/fog around the floating island
-    const mistParticleCount = 200;
-    const mistGeometry = new THREE.BufferGeometry();
-    const mistPositions = new Float32Array(mistParticleCount * 3);
-    
-    for (let i = 0; i < mistParticleCount; i++) {
-      const i3 = i * 3;
-      const angle = Math.random() * Math.PI * 2;
-      const radius = 20 + Math.random() * 10;
-      
-      mistPositions[i3] = Math.cos(angle) * radius;
-      mistPositions[i3 + 1] = -2 - Math.random() * 8;
-      mistPositions[i3 + 2] = Math.sin(angle) * radius;
-    }
-    
-    mistGeometry.setAttribute('position', new THREE.BufferAttribute(mistPositions, 3));
-    
-    const mistMaterial = new THREE.PointsMaterial({
-      color: 0xaabbff,
-      size: 1.5,
-      transparent: true,
-      opacity: 0.5,
-      sizeAttenuation: true
-    });
-    
-    const mistParticles = new THREE.Points(mistGeometry, mistMaterial);
-    
-    // Add animation data for mist
-    mistParticles.userData = {
-      initialPositions: mistPositions.slice(),
-      update: (time) => {
-        const positions = mistParticles.geometry.attributes.position.array;
-        for (let i = 0; i < mistParticleCount; i++) {
-          const i3 = i * 3;
-          
-          // Gentle swirling motion
-          const angle = Math.atan2(positions[i3 + 2], positions[i3]);
-          const radius = Math.sqrt(positions[i3] * positions[i3] + positions[i3 + 2] * positions[i3 + 2]);
-          
-          // Update angle for swirling
-          const newAngle = angle + 0.0005 * Math.sin(time * 0.0001 + i * 0.01);
-          
-          positions[i3] = Math.cos(newAngle) * radius;
-          positions[i3 + 2] = Math.sin(newAngle) * radius;
-          
-          // Gentle vertical oscillation
-          positions[i3 + 1] = mistParticles.userData.initialPositions[i3 + 1] + 
-                             Math.sin(time * 0.0005 + i * 0.01) * 0.5;
-        }
-        mistParticles.geometry.attributes.position.needsUpdate = true;
-      }
-    };
-    
-    this.templeGroup.add(mistParticles);
-    
-    // Add floating sparkles near the temple
-    const sparkleCount = 50;
-    const sparkleGeometry = new THREE.BufferGeometry();
-    const sparklePositions = new Float32Array(sparkleCount * 3);
-    
-    for (let i = 0; i < sparkleCount; i++) {
-      const i3 = i * 3;
-      const angle = Math.random() * Math.PI * 2;
-      const radius = Math.random() * 15;
-      
-      sparklePositions[i3] = Math.cos(angle) * radius;
-      sparklePositions[i3 + 1] = 3 + Math.random() * 8;
-      sparklePositions[i3 + 2] = Math.sin(angle) * radius;
-    }
-    
-    sparkleGeometry.setAttribute('position', new THREE.BufferAttribute(sparklePositions, 3));
-    
-    const sparkleMaterial = new THREE.PointsMaterial({
-      color: 0xffffdd,
-      size: 0.3,
-      transparent: true,
-      opacity: 0.8,
-      sizeAttenuation: true
-    });
-    
-    const sparkleParticles = new THREE.Points(sparkleGeometry, sparkleMaterial);
-    
-    // Add animation data for sparkles
-    sparkleParticles.userData = {
-      initialPositions: sparklePositions.slice(),
-      update: (time) => {
-        const positions = sparkleParticles.geometry.attributes.position.array;
-        for (let i = 0; i < sparkleCount; i++) {
-          const i3 = i * 3;
-          
-          // Gentle floating motion
-          positions[i3] = sparkleParticles.userData.initialPositions[i3] + 
-                         Math.sin(time * 0.001 + i) * 0.2;
-          positions[i3 + 1] = sparkleParticles.userData.initialPositions[i3 + 1] + 
-                             Math.cos(time * 0.001 + i) * 0.2;
-          positions[i3 + 2] = sparkleParticles.userData.initialPositions[i3 + 2] + 
-                             Math.sin(time * 0.001 + i * 0.5) * 0.2;
-        }
-        sparkleParticles.geometry.attributes.position.needsUpdate = true;
-        
-        // Pulse the opacity for twinkling effect
-        sparkleMaterial.opacity = 0.5 + Math.sin(time * 0.003) * 0.3;
-      }
-    };
-    
-    this.templeGroup.add(sparkleParticles);
-  }
-  
-  createPortalTrigger(templeX, templeY, templeZ) {
+  createPortalTrigger(islandX, islandY, islandZ) {
     // Create a trigger area in front of the temple entrance to redirect to temple.html
     const portalPosition = new THREE.Vector3(
-      templeX,
-      templeY,
-      templeZ + 8 // Position in front of temple entrance
+      islandX,
+      islandY + 1, // Slightly above island surface
+      islandZ + 8 // Position in front of temple entrance
     );
     
     // Add an invisible trigger box
@@ -1222,27 +958,83 @@ class TemplesManager {
     this.questManager.setTempleFound(true);
   }
   
-  // Animation update method to be called in the main game loop
-   // Animation update method
-   update(time) {
+  addTempleLighting() {
+    // Add dramatic lighting to the temple area
+    
+    // Main light beam from above
+    const templeSpotlight = new THREE.SpotLight(0xffffcc, 1.5, 50, Math.PI / 6, 0.5, 1);
+    templeSpotlight.position.set(0, 20, 0);
+    templeSpotlight.target = this.templeGroup;
+    templeSpotlight.castShadow = true;
+    this.templeGroup.add(templeSpotlight);
+    
+    // Add secondary lighting around the temple
+    const secondaryLights = [
+      { position: new THREE.Vector3(-15, 5, -15), color: 0x88aaff, intensity: 1 },
+      { position: new THREE.Vector3(15, 5, -15), color: 0x88aaff, intensity: 1 },
+      { position: new THREE.Vector3(0, 5, 15), color: 0xffffaa, intensity: 1.5 }
+    ];
+    
+    secondaryLights.forEach(light => {
+      const pointLight = new THREE.PointLight(light.color, light.intensity, 30);
+      pointLight.position.copy(light.position);
+      this.templeGroup.add(pointLight);
+    });
+    
+    // Add ambient lighting to ensure visibility
+    const ambientLight = new THREE.AmbientLight(0x445577, 0.5);
+    this.templeGroup.add(ambientLight);
+    
+    // Add stair lighting
+    this.addStairLighting();
+  }
+  
+  addStairLighting() {
+    // Add ground-level lighting at the base of the stairs
+    const groundLight = new THREE.PointLight(0xffffaa, 2, 20);
+    groundLight.position.set(
+      this.templeGroup.position.x,
+      2,
+      this.templeGroup.position.z + 35 // At start of stairs
+    );
+    this.scene.add(groundLight);
+    
+    // Add path lights along the stairs
+    for (let i = 0; i < 3; i++) {
+      const stairLight = new THREE.SpotLight(0xaaddff, 1, 30, Math.PI / 6, 0.5, 1);
+      stairLight.position.set(
+        this.templeGroup.position.x,
+        5 + i * 5,
+        this.templeGroup.position.z + 25 - i * 10
+      );
+      stairLight.target.position.set(
+        this.templeGroup.position.x,
+        0,
+        this.templeGroup.position.z + 15 - i * 10
+      );
+      stairLight.castShadow = true;
+      this.scene.add(stairLight);
+      this.scene.add(stairLight.target);
+    }
+  }
+  
+  // Animation update method
+  update(time) {
     // Update any animated elements in the temple
     if (this.templeGroup) {
-      // Update floating crystals
-      this.islandGroup.children.forEach(child => {
+      // Update temple elements
+      this.templeGroup.children.forEach(child => {
         if (child.userData && child.userData.update) {
           child.userData.update(time);
         }
       });
       
-      // Update other animated elements
+      // Update other scene elements
       this.scene.children.forEach(child => {
         if (child.userData && child.userData.update) {
           child.userData.update(time);
         }
       });
-      
-      // Gentler floating motion for the temple
-      this.templeGroup.position.y = this.templeGroup.position.y + Math.sin(time * 0.0001) * 0.005;
     }
   }
 }
