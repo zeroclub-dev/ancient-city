@@ -2,6 +2,8 @@
  * Main Game class
  * Initializes and coordinates all game systems
  */
+import TempleCollision from './js/buildings/TempleCollision.js';
+
 class Game {
   constructor() {
     // Game state
