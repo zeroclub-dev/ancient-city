@@ -12,70 +12,66 @@ class GroundManager {
   
   
   createGround() {
-  // Create terrain geometry
-  const groundGeometry = new THREE.PlaneGeometry(500, 500, 2, 2);
-  groundGeometry.rotateX(-Math.PI / 2);
-  
-  // Create height variations
-  const positions = groundGeometry.attributes.position.array;
-  for (let i = 0; i < positions.length; i += 3) {
-    const x = positions[i];
-    const z = positions[i + 2];
+    // Create terrain geometry
+    const groundGeometry = new THREE.PlaneGeometry(500, 500, 128, 128);
+    groundGeometry.rotateX(-Math.PI / 2);
     
-    // Keep center area flatter for city
-    const distFromCenter = Math.sqrt(x * x + z * z);
-    let height = 0;
-    
-    if (distFromCenter > 50) {
-
-      // Perlin-like noise for rolling hills outside city
-      height = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 2;
-      height += Math.sin(x * 0.01 + z * 0.01) * 3;
+    // Create height variations with SIGNIFICANTLY REDUCED HEIGHT
+    const positions = groundGeometry.attributes.position.array;
+    for (let i = 0; i < positions.length; i += 3) {
+      const x = positions[i];
+      const z = positions[i + 2];
       
-      // Add more height at edges
-      const edgeFactor = (distFromCenter - 50) / 200;
-      height += edgeFactor * 10;
+      // Keep center area completely flat for city
+      const distFromCenter = Math.sqrt(x * x + z * z);
+      let height = 0;
+      
+      if (distFromCenter > 80) { // Increased flat area radius from 50 to 80
+        // Perlin-like noise for rolling hills outside city
+        // Significantly reduced height multipliers
+        height = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 0.5; // Reduced from 2 to 0.5
+        height += Math.sin(x * 0.01 + z * 0.01) * 0.75; // Reduced from 3 to 0.75
+        
+        // Add more height at edges but with reduced impact
+        const edgeFactor = (distFromCenter - 80) / 400; // Reduced slope (was 50/200)
+        height += edgeFactor * 4; // Reduced from 10 to 4
+      }
+      positions[i + 1] = height;
     }
-    positions[i + 1] = height;
+    
+    // Update normals for proper lighting
+    groundGeometry.computeVertexNormals();
+    
+    // Create ground material and texture
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0x91814D,
+      roughness: 0.8,
+      metalness: 0.1
+    });
+    
+    // Create or load ground texture
+    this.createGroundTexture(groundMaterial);
+    
+    // Create ground mesh
+    this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    this.ground.receiveShadow = true;
+    this.scene.add(this.ground);
+    
+    // Set ground level in collision system
+    if (window.collisionManager) {
+      window.collisionManager.setGroundLevel(this.groundLevel);
+    }
+    
+    // Add a ground plane collider for accurate collision detection
+    this.addGroundCollider();
+    
+    // Add terrain details
+    this.addTerrainDetails();
+  
+    // Ensure ground has proper collision properties
+    this.ensureProperFloorCollisions();
   }
   
-  // Update normals for proper lighting
-  groundGeometry.computeVertexNormals();
-  
-  // FIX: Use the grass texture from the texture engine
-  const { grassTexture } = this.textureEngine.getTextures();
-  const groundMaterial = new THREE.MeshStandardMaterial({
-    map: grassTexture,
-    roughness: 1.0,
-    metalness: 0,
-  });
-  
-  // Set proper texture repeat for the large ground
-  if (grassTexture) {
-    grassTexture.wrapS = THREE.RepeatWrapping;
-    grassTexture.wrapT = THREE.RepeatWrapping;
-    grassTexture.repeat.set(50, 50); // Adjust repeating to cover large ground area
-  }
-  
-  // Create ground mesh
-  this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
-  this.ground.receiveShadow = true;
-  this.scene.add(this.ground);
-  
-  // Set ground level in collision system
-  if (window.collisionManager) {
-    window.collisionManager.setGroundLevel(this.groundLevel);
-  }
-  
-  // Add a ground plane collider for accurate collision detection
-  this.addGroundCollider();
-  
-  // Add terrain details
-  this.addTerrainDetails();
-  
-  // Ensure ground has proper collision properties
-  this.ensureProperFloorCollisions();
-}
   ensureProperFloorCollisions() {
     // Make sure the ground has a name for identification in raycasts
     if (this.ground) {
@@ -205,7 +201,8 @@ class GroundManager {
     displacementMap.repeat.set(10, 10);
     
     groundMaterial.displacementMap = displacementMap;
-    groundMaterial.displacementScale = 0.5;
+    // Significantly reduce displacement scale from 0.5 to 0.1
+    groundMaterial.displacementScale = 0.1;
     groundMaterial.roughnessMap = displacementMap;
   }
   
@@ -240,12 +237,12 @@ class GroundManager {
       // Find approximate terrain height at this position
       if (this.ground && this.ground.geometry) {
         const distFromCenter = Math.sqrt(x * x + z * z);
-        if (distFromCenter > 50) {
-          // Use same height calculation as in createGround
-          y = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 2;
-          y += Math.sin(x * 0.01 + z * 0.01) * 3;
-          const edgeFactor = (distFromCenter - 50) / 200;
-          y += edgeFactor * 10;
+        if (distFromCenter > 80) {
+          // Use same height calculation as in createGround but with REDUCED values
+          y = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 0.5;
+          y += Math.sin(x * 0.01 + z * 0.01) * 0.75;
+          const edgeFactor = (distFromCenter - 80) / 400;
+          y += edgeFactor * 4;
         }
       }
       
@@ -299,12 +296,12 @@ class GroundManager {
       // Find approximate terrain height at this position
       if (this.ground && this.ground.geometry) {
         const distFromCenter = Math.sqrt(x * x + z * z);
-        if (distFromCenter > 50) {
-          // Use same height calculation as in createGround
-          y = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 2;
-          y += Math.sin(x * 0.01 + z * 0.01) * 3;
-          const edgeFactor = (distFromCenter - 50) / 200;
-          y += edgeFactor * 10;
+        if (distFromCenter > 80) {
+          // Use same height calculation as in createGround with REDUCED values
+          y = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 0.5;
+          y += Math.sin(x * 0.01 + z * 0.01) * 0.75;
+          const edgeFactor = (distFromCenter - 80) / 400;
+          y += edgeFactor * 4;
         }
       }
       
@@ -378,12 +375,12 @@ class GroundManager {
       // Find approximate terrain height at this position
       if (this.ground && this.ground.geometry) {
         const distFromCenter = Math.sqrt(x * x + z * z);
-        if (distFromCenter > 50) {
-          // Use same height calculation as in createGround
-          y = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 2;
-          y += Math.sin(x * 0.01 + z * 0.01) * 3;
-          const edgeFactor = (distFromCenter - 50) / 200;
-          y += edgeFactor * 10;
+        if (distFromCenter > 80) {
+          // Use same height calculation as in createGround with REDUCED values
+          y = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 0.5;
+          y += Math.sin(x * 0.01 + z * 0.01) * 0.75;
+          const edgeFactor = (distFromCenter - 80) / 400;
+          y += edgeFactor * 4;
         }
       }
       
@@ -429,12 +426,12 @@ class GroundManager {
       // Find approximate terrain height at this position
       if (this.ground && this.ground.geometry) {
         const distFromCenter = Math.sqrt(x * x + z * z);
-        if (distFromCenter > 50) {
-          // Use same height calculation as in createGround
-          y = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 2;
-          y += Math.sin(x * 0.01 + z * 0.01) * 3;
-          const edgeFactor = (distFromCenter - 50) / 200;
-          y += edgeFactor * 10;
+        if (distFromCenter > 80) {
+          // Use same height calculation as in createGround with REDUCED values
+          y = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 0.5;
+          y += Math.sin(x * 0.01 + z * 0.01) * 0.75;
+          const edgeFactor = (distFromCenter - 80) / 400;
+          y += edgeFactor * 4;
         }
       }
       
