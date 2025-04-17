@@ -3,8 +3,9 @@
  * Initializes and coordinates all game systems
  */
 
+import { TempleCollision } from './js/buildings/TempleCollision.js';
+
 class Game {
-  import { TempleCollision } from './js/buildings/TempleCollision.js';
 
   constructor() {
     // Game state
