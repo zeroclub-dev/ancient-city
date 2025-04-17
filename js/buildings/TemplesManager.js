@@ -27,7 +27,7 @@ class TemplesManager {
     // Position temple near the plaza/agora
     const templeX = -40;
     const templeZ = 40;
-    let groundY = 0;
+    const groundY = 0;
     
     // Calculate ground height at the temple position
     const distFromCenter = Math.sqrt(templeX * templeX + templeZ * templeZ);
