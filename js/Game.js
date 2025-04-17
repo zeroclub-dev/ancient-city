@@ -190,6 +190,11 @@ this.lightingManager.enhanceMarbleMaterials(this.scene);
 
 // Create city structures
 await this.setupCityStructures();
+// Initialize temple collision system
+this.templeCollision = new TempleCollision(this.scene, this.collisionManager, this.questManager, this.dialogManager);
+this.templeCollision.setup(this.templesManager.templeGroup, this.playerController);
+// Make it globally accessible
+window.templeCollision = this.templeCollision;
 // Initialize collision system after all structures are loaded
 this.initCollisionSystem();
 
@@ -278,11 +283,6 @@ if (this.templeCollision && this.playerController) {
     
     // Create temple
     await this.templesManager.createTempleOfApollo();
-    // Initialize temple collision system
-this.templeCollision = new TempleCollision(this.scene, this.collisionManager, this.questManager, this.dialogManager);
-this.templeCollision.setup(this.templesManager.templeGroup, this.playerController);
-// Make it globally accessible
-window.templeCollision = this.templeCollision;
 
     console.log("All city structures created");
   }
