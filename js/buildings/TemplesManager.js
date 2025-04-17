@@ -17,8 +17,7 @@ class TemplesManager {
     this.portalTrigger = null;
     this.portalObject = null;
   }
-  let groundY = 0;
-
+  
   async createTempleOfApollo() {
     this.templeGroup = new THREE.Group();
     
@@ -28,7 +27,7 @@ class TemplesManager {
     // Position temple near the plaza/agora
     const templeX = -40;
     const templeZ = 40;
-    let groundY = 0;
+    const groundY = 0;
     
     // Calculate ground height at the temple position
     const distFromCenter = Math.sqrt(templeX * templeX + templeZ * templeZ);
@@ -766,7 +765,7 @@ class TemplesManager {
     });
     
     // Create decorative elements around the portal
-    this.createPortalPedestals(groundY + platformHeight, goldTexture, marbleTexture);
+    this.createPortalPedestals(groundY + platformHeight, groundY, goldTexture, marbleTexture);
     
     // Add portal particles (will be animated)
     this.createPortalParticles(groundY + platformHeight);
@@ -963,7 +962,8 @@ class TemplesManager {
     }
   }
   
-  createPortalPedestals(platformY, goldTexture, marbleTexture) {
+
+  createPortalPedestals(platformY, groundY, goldTexture, marbleTexture)  {
     // Add decorative pedestals around the platform
     const pedestalCount = 4;
     for (let i = 0; i < pedestalCount; i++) {
