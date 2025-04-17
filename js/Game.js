@@ -217,44 +217,50 @@ console.log(`Total colliders in world: ${this.collisionManager.colliders.length}
 
 // Update the animate method to use the advanced collision system
 animate() {
-this._animationFrameId = requestAnimationFrame(this.animate.bind(this));
-
-try {
-  const time = performance.now();
-  const delta = Math.min((time - this.prevTime) / 1000, 0.1); // Cap delta time
+  // Request next frame at the beginning to ensure smooth animation even if errors occur
+  this._animationFrameId = requestAnimationFrame(this.animate.bind(this));
   
-  // Update managers
-  if (!this.dialogManager.isOpen()) {
-    this.playerController.update(delta);
-  }
-  
-  // Update skybox first
-  if (this.skyboxManager) {
-    this.skyboxManager.update(time);
-    if (this.skyboxManager.skybox && this.camera) {
-      this.skyboxManager.skybox.position.copy(this.camera.position);
-    }
-  }
-  
-  // Update other systems
-  if (this.lightingManager) this.lightingManager.update(time);
-  if (this.atmosphericEffects) this.atmosphericEffects.update(time, delta);
-  if (this.questManager && this.camera) this.questManager.update(this.camera);
-  
-  // Render only if all required objects exist
-  if (this.renderer && this.scene && this.camera) {
-    // Clear any previous renders
-    this.renderer.clear();
+  try {
+    const time = performance.now();
+    const delta = Math.min((time - this.prevTime) / 1000, 0.1); // Cap delta time
     
-    // Render the scene
-    this.renderer.render(this.scene, this.camera);
+    // Update managers
+    if (!this.dialogManager.isOpen()) {
+      this.playerController.update(delta);
+    }
+    
+    // Update skybox first
+    if (this.skyboxManager) {
+      this.skyboxManager.update(time);
+      if (this.skyboxManager.skybox && this.camera) {
+        this.skyboxManager.skybox.position.copy(this.camera.position);
+      }
+    }
+    
+    // Update other systems
+    if (this.lightingManager) this.lightingManager.update(time);
+    if (this.atmosphericEffects) this.atmosphericEffects.update(time, delta);
+    if (this.questManager && this.camera) this.questManager.update(this.camera);
+    
+    // Update temple manager and check portal activation - NEW
+    if (this.templesManager && this.playerController) {
+      this.templesManager.update(time, this.playerController.position);
+    }
+    
+    // Render only if all required objects exist
+    if (this.renderer && this.scene && this.camera) {
+      // Clear any previous renders
+      this.renderer.clear();
+      
+      // Render the scene
+      this.renderer.render(this.scene, this.camera);
+    }
+    
+    this.prevTime = time;
+  } catch (error) {
+    console.error("Error in animation loop:", error);
+    // Continue animation loop despite errors
   }
-  
-  this.prevTime = time;
-} catch (error) {
-  console.error("Error in animation loop:", error);
-  // Continue animation loop despite errors
-}
 }
   
   async setupCityStructures() {

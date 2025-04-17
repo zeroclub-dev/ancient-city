@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temple of Apollo - Ancient Greek Instruments</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Georgia', serif;
+            background-color: #f5f2e8;
+            color: #333;
+        }
+        header {
+            background-color: #d4af37;
+            color: #fff;
+            text-align: center;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin: 0;
+            font-size: 2.5rem;
+        }
+        .subtitle {
+            font-style: italic;
+            margin-top: 10px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .intro {
+            text-align: center;
+            margin: 30px 0;
+            line-height: 1.6;
+            font-size: 1.1rem;
+        }
+        .back-button {
+            display: inline-block;
+            background-color: #d4af37;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+        .back-button:hover {
+            background-color: #b28e29;
+        }
+        .instruments-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        .instrument-card {
+            background-color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+        .instrument-card:hover {
+            transform: translateY(-5px);
+        }
+        .instrument-image {
+            width: 100%;
+            height: 200px;
+            background-color: #eee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .instrument-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .instrument-info {
+            padding: 20px;
+        }
+        .instrument-title {
+            margin-top: 0;
+            color: #d4af37;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+        .instrument-description {
+            line-height: 1.6;
+        }
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 20px;
+            background-color: #333;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Temple of Apollo</h1>
+        <div class="subtitle">The Home of Ancient Greek Musical Instruments</div>
+    </header>
+
+    <div class="container">
+        <div class="intro">
+            <p>Welcome to the Temple of Apollo, sanctuary of music and the arts. Here you can explore the ancient instruments that shaped Greek music and culture.</p>
+            <p>Each instrument has its own unique history, sound, and role in ancient Greek society. Discover the stories and sounds that have echoed through time.</p>
+            <a href="index.html" class="back-button">Return to World</a>
+        </div>
+
+        <div class="instruments-container">
+            <!-- Lyre -->
+            <div class="instrument-card">
+                <div class="instrument-image">
+                    <img src="textures/instruments/lyre.jpg" alt="Lyre" onerror="this.src='https://via.placeholder.com/400x300?text=Lyre'">
+                </div>
+                <div class="instrument-info">
+                    <h3 class="instrument-title">Lyre (Chelys)</h3>
+                    <p class="instrument-description">
+                        The lyre was the most beloved string instrument of ancient Greece, associated with Apollo and the Muses.
+                        Made from a tortoise shell with arms of wood or horn, it typically had seven strings. 
+                        The lyre was played by strumming with a plectrum while fingers of the other hand dampened unwanted strings.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Kithara -->
+            <div class="instrument-card">
+                <div class="instrument-image">
+                    <img src="textures/instruments/kithara.jpg" alt="Kithara" onerror="this.src='https://via.placeholder.com/400x300?text=Kithara'">
+                </div>
+                <div class="instrument-info">
+                    <h3 class="instrument-title">Kithara</h3>
+                    <p class="instrument-description">
+                        The kithara was a professional version of the lyre with a wooden sound box.
+                        Used by skilled musicians called kitharodes, it featured in contests and
+                        had a deeper, more resonant sound than the lyre. Apollo was often depicted
+                        bearing this prestigious instrument.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Aulos -->
+            <div class="instrument-card">
+                <div class="instrument-image">
+                    <img src="textures/instruments/aulos.jpg" alt="Aulos" onerror="this.src='https://via.placeholder.com/400x300?text=Aulos'">
+                </div>
+                <div class="instrument-info">
+                    <h3 class="instrument-title">Aulos (Double Pipes)</h3>
+                    <p class="instrument-description">
+                        The aulos consisted of two pipes with reed mouthpieces played simultaneously.
+                        Its powerful, penetrating sound featured in religious rituals, theater performances, and even
+                        on the battlefield. The aulos had a reputation for evoking strong emotions and was associated
+                        with the worship of Dionysus.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Syrinx -->
+            <div class="instrument-card">
+                <div class="instrument-image">
+                    <img src="textures/instruments/syrinx.jpg" alt="Pan Flute" onerror="this.src='https://via.placeholder.com/400x300?text=Pan+Flute'">
+                </div>
+                <div class="instrument-info">
+                    <h3 class="instrument-title">Syrinx (Pan Flute)</h3>
+                    <p class="instrument-description">
+                        The syrinx consisted of graduated pipes bound together, each producing a single note when blown across.
+                        Associated with the god Pan and shepherds, it produced a sweet, breathy sound ideal for pastoral settings.
+                        According to myth, it was created by Pan from reeds into which the nymph Syrinx had been transformed.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Tympanon -->
+            <div class="instrument-card">
+                <div class="instrument-image">
+                    <img src="textures/instruments/tympanon.jpg" alt="Frame Drum" onerror="this.src='https://via.placeholder.com/400x300?text=Tympanon'">
+                </div>
+                <div class="instrument-info">
+                    <h3 class="instrument-title">Tympanon (Frame Drum)</h3>
+                    <p class="instrument-description">
+                        The tympanon was a handheld drum used particularly in ecstatic religious rites dedicated to Dionysus and Cybele.
+                        It consisted of a wooden hoop with stretched animal hide. Often played by women,
+                        its deep, resonant sound helped induce trance-like states during festivals and processions.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Hydraulis -->
+            <div class="instrument-card">
+                <div class="instrument-image">
+                    <img src="textures/instruments/hydraulis.jpg" alt="Water Organ" onerror="this.src='https://via.placeholder.com/400x300?text=Hydraulis'">
+                </div>
+                <div class="instrument-info">
+                    <h3 class="instrument-title">Hydraulis (Water Organ)</h3>
+                    <p class="instrument-description">
+                        Invented in the 3rd century BCE by Ctesibius of Alexandria, the hydraulis was the world's first keyboard instrument.
+                        It used water pressure to regulate airflow through a series of pipes, creating a powerful, sustained sound.
+                        This remarkable feat of engineering bridged music and science, demonstrating Greek innovation.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2025 Temple of Apollo - All Rights Reserved</p>
+        <p>The home of ancient Greek musical heritage</p>
+    </footer>
+</body>
+</html>
