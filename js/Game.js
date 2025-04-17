@@ -26,6 +26,7 @@ class Game {
 
     // Building systems
     this.templesManager = null;
+    this.templeCollision = null;
     this.buildingsManager = null;
     this.structuresManager = null;
     this.decorationsManager = null;
@@ -243,9 +244,11 @@ animate() {
     if (this.questManager && this.camera) this.questManager.update(this.camera);
     
     // Update temple manager and check portal activation - NEW
-    if (this.templesManager && this.playerController) {
-      this.templesManager.update(time, this.playerController.position);
-    }
+
+    // Update temple collision detection and portal effects
+if (this.templeCollision && this.playerController) {
+  this.templeCollision.update(time, this.playerController.position);
+  }
     
     // Render only if all required objects exist
     if (this.renderer && this.scene && this.camera) {
@@ -275,7 +278,12 @@ animate() {
     
     // Create temple
     await this.templesManager.createTempleOfApollo();
-    
+    // Initialize temple collision system
+this.templeCollision = new TempleCollision(this.scene, this.collisionManager, this.questManager, this.dialogManager);
+this.templeCollision.setup(this.templesManager.templeGroup, this.playerController);
+// Make it globally accessible
+window.templeCollision = this.templeCollision;
+
     console.log("All city structures created");
   }
   

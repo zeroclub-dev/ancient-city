@@ -564,18 +564,17 @@ class TemplesManager {
   // New method to specifically add a floor collider
   ensureTempleFloorCollision(groundY) {
     this.collisionManager.addCollider({
-      position: new THREE.Vector3(this.templeGroup.position.x, 1.6 + groundY, this.templeGroup.position.z),
-      radius: 10,
-      type: 'box',
-      width: 19.5,
-      height: 0.2, 
-      depth: 19.5,
-      name: "temple_floor", // Name it for identification
-      userData: { isFloor: true } // Flag it as floor for physics/collision
+    position: new THREE.Vector3(this.templeGroup.position.x, 1.6 + groundY, this.templeGroup.position.z),
+    radius: 10,
+    type: 'box',
+    width: 19.5,
+    height: 1.0, // INCREASED from 0.2 to 1.0 to ensure player doesn't fall through
+    depth: 19.5,
+    name: "temple_floor", // Name it for identification
+    userData: { isFloor: true } // Flag it as floor for physics/collision
     });
-    
     console.log("Added temple floor collision at height:", 1.6 + groundY);
-  }
+    }
   
   createApolloStatue(groundY, marbleTexture, goldTexture) {
     const statueGroup = new THREE.Group();
@@ -714,45 +713,39 @@ class TemplesManager {
     // *** NEW: Create raised platform with stairs ***
     
     // Create main platform - elevated
-    const platformHeight = 1.0; // Height of the platform
-    const platformGeometry = new THREE.BoxGeometry(10, platformHeight, 5);
-    const platformMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      map: marbleTexture,
-      roughness: 0.5,
-      metalness: 0.2
-    });
-    
-    const platform = new THREE.Mesh(platformGeometry, platformMaterial);
-    platform.position.set(0, groundY + platformHeight/2, 14); // Position in front of temple
-    platform.receiveShadow = true;
-    this.templeGroup.add(platform);
-    
-    // Create steps leading up to platform
-    this.createPortalSteps(groundY, platformHeight, marbleTexture);
-    
-    // Create physical portal structure on the platform
-    this.createPhysicalPortal(groundY + platformHeight, goldTexture, marbleTexture);
-    
-    // Register the portal platform as a collider
-    this.platformCollider = {
-      position: new THREE.Vector3(this.templeGroup.position.x, groundY + platformHeight/2, this.templeGroup.position.z + 14),
-      radius: 5,
-      type: 'box',
-      width: 10,
-      height: platformHeight,
-      depth: 5
-    };
-    
-    // Add to collision system
-    this.collisionManager.addCollider(this.platformCollider);
-    
-    // Create portal trigger for teleportation
-    this.portalTrigger = {
-      position: new THREE.Vector3(this.templeGroup.position.x, groundY + platformHeight + 1, this.templeGroup.position.z + 14),
-      radius: 2, // Reduced from 4 to 2 to be more precise
-      onEnter: () => this.activatePortal()
-    };
+const platformHeight = 1.0; // Height of the platform
+const platformGeometry = new THREE.BoxGeometry(10, platformHeight, 5);
+const platformMaterial = new THREE.MeshStandardMaterial({
+color: 0xffffff,
+map: marbleTexture,
+roughness: 0.5,
+metalness: 0.2
+});
+const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+platform.position.set(0, groundY + platformHeight/2, 14); // Position in front of temple
+platform.receiveShadow = true;
+this.templeGroup.add(platform);
+// Create steps leading up to platform
+this.createPortalSteps(groundY, platformHeight, marbleTexture);
+// Create physical portal structure on the platform
+this.createPhysicalPortal(groundY + platformHeight, goldTexture, marbleTexture);
+// Register the portal platform as a collider
+this.platformCollider = {
+position: new THREE.Vector3(this.templeGroup.position.x, groundY + platformHeight/2, this.templeGroup.position.z + 14),
+radius: 5,
+type: 'box',
+width: 10,
+height: platformHeight,
+depth: 5
+};
+// Add to collision system
+this.collisionManager.addCollider(this.platformCollider);
+// Create portal trigger for teleportation
+this.portalTrigger = {
+position: new THREE.Vector3(this.templeGroup.position.x, groundY + platformHeight + 1, this.templeGroup.position.z + 14),
+radius: 2, // Reduced from 4 to 2 to be more precise
+onEnter: () => this.activatePortal()
+};
     
     // Add interaction object for the portal
     this.playerController.addInteractiveObject({
@@ -773,48 +766,33 @@ class TemplesManager {
   
   createPortalSteps(groundY, platformHeight, marbleTexture) {
     const stepMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      map: marbleTexture,
-      roughness: 0.5,
-      metalness: 0.1
+    color: 0xffffff,
+    map: marbleTexture,
+    roughness: 0.5,
+    metalness: 0.1
     });
-    
     // Number of steps
     const stepCount = 4;
     const stepHeight = platformHeight / stepCount;
     const stepDepth = 0.8;
-    
+    // FIX: Correct the steps going in the wrong direction
     // Create steps on the front side of the platform
     for (let i = 0; i < stepCount; i++) {
-      const stepWidth = 4; // Width of the steps
-      const stepGeometry = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth);
-      const step = new THREE.Mesh(stepGeometry, stepMaterial);
-      
-      // Position each step
-      step.position.set(
-        0, // Centered on x-axis
-        groundY + (i + 0.5) * stepHeight, // Stacked vertically
-        14 + 2.5 + (i + 0.5) * stepDepth // Extend outward from platform
-      );
-      
-      step.receiveShadow = true;
-      step.castShadow = true;
-      this.templeGroup.add(step);
-      
-      // Add collision for each step
-      this.collisionManager.addCollider({
-        position: new THREE.Vector3(
-          this.templeGroup.position.x, 
-          groundY + (i + 0.5) * stepHeight, 
-          this.templeGroup.position.z + 14 + 2.5 + (i + 0.5) * stepDepth
-        ),
-        type: 'box',
-        width: stepWidth,
-        height: stepHeight,
-        depth: stepDepth
-      });
-    }
-  }
+    const stepWidth = 4; // Width of the steps
+    const stepGeometry = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth);
+    const step = new THREE.Mesh(stepGeometry, stepMaterial);
+    // FIX: Position each step correctly to come DOWN from the platform
+    // We flip the position so the steps go out from the platform in the right direction
+    step.position.set(
+      0, // Centered on x-axis
+      groundY + (i + 0.5) * stepHeight, // Stacked vertically
+      14 + 2.5 + (stepCount - i - 0.5) * stepDepth // <-- FIXED - steps go AWAY from platform
+    );
+    
+    step.receiveShadow = true;
+    step.castShadow = true;
+    this.templeGroup.add(step);
+  }}
   
   createPhysicalPortal(platformY, goldTexture, marbleTexture) {
     const portalGroup = new THREE.Group();
