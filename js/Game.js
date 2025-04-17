@@ -4,7 +4,7 @@
  */
 
 class Game {
-  import TempleCollision from './js/buildings/TempleCollision.js';
+  import { TempleCollision } from './js/buildings/TempleCollision.js';
 
   constructor() {
     // Game state
