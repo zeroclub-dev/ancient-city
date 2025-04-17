@@ -15,6 +15,7 @@ class TemplesManager {
     this.portalActive = false;
     this.platformCollider = null;
     this.portalTrigger = null;
+    this.portalObject = null;
   }
   
   async createTempleOfApollo() {
@@ -30,12 +31,12 @@ class TemplesManager {
     
     // Calculate ground height at the temple position
     const distFromCenter = Math.sqrt(templeX * templeX + templeZ * templeZ);
-    if (distFromCenter > 50) {
-      // Use same height calculation as in ground manager
-      groundY = Math.sin(templeX * 0.05) * Math.cos(templeZ * 0.05) * 2;
-      groundY += Math.sin(templeX * 0.01 + templeZ * 0.01) * 3;
-      const edgeFactor = (distFromCenter - 50) / 200;
-      groundY += edgeFactor * 10;
+    if (distFromCenter > 80) {
+      // Use same height calculation as in ground manager (with reduced values)
+      groundY = Math.sin(templeX * 0.05) * Math.cos(templeZ * 0.05) * 0.5;
+      groundY += Math.sin(templeX * 0.01 + templeZ * 0.01) * 0.75;
+      const edgeFactor = (distFromCenter - 80) / 400;
+      groundY += edgeFactor * 4;
     }
     
     // Create approach pathway
@@ -56,13 +57,13 @@ class TemplesManager {
     // Create pediments (triangular parts under the roof)
     this.createPediments(groundY, marbleTexture);
     
-    // Create temple interior
+    // Create temple interior with solid floor
     this.createTempleInterior(groundY, marbleTexture);
     
     // Create Apollo statue inside
     this.createApolloStatue(groundY, marbleTexture, goldTexture);
     
-    // Create portal platform in front of the temple
+    // Create portal platform in front of the temple with stairs
     this.createPortalPlatform(groundY, goldTexture, marbleTexture);
     
     // Add lighting to emphasize the temple
@@ -543,7 +544,7 @@ class TemplesManager {
     backWall.receiveShadow = true;
     this.templeGroup.add(backWall);
     
-    // Create interior floor
+    // Create interior floor - This is the key addition for standing on
     const floorGeometry = new THREE.BoxGeometry(19.5, 0.2, 19.5);
     const floorMaterial = new THREE.MeshStandardMaterial({
       color: 0xeeeeee,
@@ -555,6 +556,25 @@ class TemplesManager {
     floor.position.y = 1.6 + groundY; // Position on top of platform
     floor.receiveShadow = true;
     this.templeGroup.add(floor);
+    
+    // Add floor collision for player to stand on
+    this.ensureTempleFloorCollision(groundY);
+  }
+  
+  // New method to specifically add a floor collider
+  ensureTempleFloorCollision(groundY) {
+    this.collisionManager.addCollider({
+      position: new THREE.Vector3(this.templeGroup.position.x, 1.6 + groundY, this.templeGroup.position.z),
+      radius: 10,
+      type: 'box',
+      width: 19.5,
+      height: 0.2, 
+      depth: 19.5,
+      name: "temple_floor", // Name it for identification
+      userData: { isFloor: true } // Flag it as floor for physics/collision
+    });
+    
+    console.log("Added temple floor collision at height:", 1.6 + groundY);
   }
   
   createApolloStatue(groundY, marbleTexture, goldTexture) {
@@ -677,38 +697,50 @@ class TemplesManager {
     statueGroup.add(laurel);
     
     // Position statue
-    statueGroup.position.set(0, 1.5 + groundY, -5);
+    statueGroup.position.set(0, 1.6 + groundY, -5);
     statueGroup.scale.set(1.5, 1.5, 1.5);
     this.templeGroup.add(statueGroup);
+    
+    // Add collision for the statue base
+    this.collisionManager.addCollider({
+      position: new THREE.Vector3(this.templeGroup.position.x, 1.6 + groundY, this.templeGroup.position.z - 5),
+      radius: 2.5
+    });
     
     return statueGroup;
   }
   
   createPortalPlatform(groundY, goldTexture, marbleTexture) {
-    // Create portal platform
-    const platformGeometry = new THREE.BoxGeometry(10, 0.5, 5);
+    // *** NEW: Create raised platform with stairs ***
+    
+    // Create main platform - elevated
+    const platformHeight = 1.0; // Height of the platform
+    const platformGeometry = new THREE.BoxGeometry(10, platformHeight, 5);
     const platformMaterial = new THREE.MeshStandardMaterial({
-      color: 0xeeeedd,
+      color: 0xffffff,
       map: marbleTexture,
       roughness: 0.5,
       metalness: 0.2
     });
     
     const platform = new THREE.Mesh(platformGeometry, platformMaterial);
-    platform.position.set(0, groundY + 0.25, 14); // Position in front of temple
+    platform.position.set(0, groundY + platformHeight/2, 14); // Position in front of temple
     platform.receiveShadow = true;
     this.templeGroup.add(platform);
     
-    // Create decorative portal elements
-    this.createPortalDecorations(groundY, goldTexture, marbleTexture);
+    // Create steps leading up to platform
+    this.createPortalSteps(groundY, platformHeight, marbleTexture);
     
-    // Register the portal platform as a collider but store the reference to use for portal check
+    // Create physical portal structure on the platform
+    this.createPhysicalPortal(groundY + platformHeight, goldTexture, marbleTexture);
+    
+    // Register the portal platform as a collider
     this.platformCollider = {
-      position: new THREE.Vector3(this.templeGroup.position.x, groundY + 0.25, this.templeGroup.position.z + 14),
+      position: new THREE.Vector3(this.templeGroup.position.x, groundY + platformHeight/2, this.templeGroup.position.z + 14),
       radius: 5,
       type: 'box',
       width: 10,
-      height: 0.5,
+      height: platformHeight,
       depth: 5
     };
     
@@ -717,63 +749,225 @@ class TemplesManager {
     
     // Create portal trigger for teleportation
     this.portalTrigger = {
-      position: new THREE.Vector3(this.templeGroup.position.x, groundY + 1, this.templeGroup.position.z + 14),
-      radius: 4,
+      position: new THREE.Vector3(this.templeGroup.position.x, groundY + platformHeight + 1, this.templeGroup.position.z + 14),
+      radius: 2, // Reduced from 4 to 2 to be more precise
       onEnter: () => this.activatePortal()
     };
     
     // Add interaction object for the portal
     this.playerController.addInteractiveObject({
-      position: new THREE.Vector3(this.templeGroup.position.x, groundY + 1, this.templeGroup.position.z + 14),
+      position: new THREE.Vector3(this.templeGroup.position.x, groundY + platformHeight + 1, this.templeGroup.position.z + 14),
       name: "Portal to Temple Interior",
-      radius: 4,
+      radius: 3,
       interact: () => {
-        this.dialogManager.showDialog("Portal", "Step into the circle to enter the Temple of Apollo and explore the ancient Greek instruments.");
+        this.dialogManager.showDialog("Portal", "Step into the portal to enter the Temple of Apollo virtual gallery and explore the ancient Greek instruments.");
       }
     });
+    
+    // Create decorative elements around the portal
+    this.createPortalPedestals(groundY + platformHeight, goldTexture, marbleTexture);
+    
+    // Add portal particles (will be animated)
+    this.createPortalParticles(groundY + platformHeight);
   }
   
-  createPortalDecorations(groundY, goldTexture, marbleTexture) {
-    // Create circular pattern on the platform
-    const circleGeometry = new THREE.CircleGeometry(3, 32);
-    const circleMaterial = new THREE.MeshStandardMaterial({
+  createPortalSteps(groundY, platformHeight, marbleTexture) {
+    const stepMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: marbleTexture,
+      roughness: 0.5,
+      metalness: 0.1
+    });
+    
+    // Number of steps
+    const stepCount = 4;
+    const stepHeight = platformHeight / stepCount;
+    const stepDepth = 0.8;
+    
+    // Create steps on the front side of the platform
+    for (let i = 0; i < stepCount; i++) {
+      const stepWidth = 4; // Width of the steps
+      const stepGeometry = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth);
+      const step = new THREE.Mesh(stepGeometry, stepMaterial);
+      
+      // Position each step
+      step.position.set(
+        0, // Centered on x-axis
+        groundY + (i + 0.5) * stepHeight, // Stacked vertically
+        14 + 2.5 + (i + 0.5) * stepDepth // Extend outward from platform
+      );
+      
+      step.receiveShadow = true;
+      step.castShadow = true;
+      this.templeGroup.add(step);
+      
+      // Add collision for each step
+      this.collisionManager.addCollider({
+        position: new THREE.Vector3(
+          this.templeGroup.position.x, 
+          groundY + (i + 0.5) * stepHeight, 
+          this.templeGroup.position.z + 14 + 2.5 + (i + 0.5) * stepDepth
+        ),
+        type: 'box',
+        width: stepWidth,
+        height: stepHeight,
+        depth: stepDepth
+      });
+    }
+  }
+  
+  createPhysicalPortal(platformY, goldTexture, marbleTexture) {
+    const portalGroup = new THREE.Group();
+    
+    // Create circular base
+    const baseGeometry = new THREE.CylinderGeometry(2.5, 2.5, 0.2, 32);
+    const baseMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd4af37,
+      map: goldTexture,
+      roughness: 0.3,
+      metalness: 0.8
+    });
+    const base = new THREE.Mesh(baseGeometry, baseMaterial);
+    base.position.y = 0.1; // Just above platform
+    base.receiveShadow = true;
+    portalGroup.add(base);
+    
+    // Create portal ring/arch
+    const ringGeometry = new THREE.TorusGeometry(2, 0.3, 16, 32, Math.PI * 2);
+    const ringMaterial = new THREE.MeshStandardMaterial({
       color: 0xd4af37,
       map: goldTexture,
       roughness: 0.3,
       metalness: 0.8,
-      transparent: true,
-      opacity: 0.8
+      emissive: 0xffcc77,
+      emissiveIntensity: 0.2
     });
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    ring.rotation.x = Math.PI / 2; // Make it stand upright
+    ring.position.y = 2; // Height of the ring
+    ring.castShadow = true;
+    portalGroup.add(ring);
     
-    const portalCircle = new THREE.Mesh(circleGeometry, circleMaterial);
-    portalCircle.rotation.x = -Math.PI / 2; // Rotate to lie flat
-    portalCircle.position.set(0, groundY + 0.51, 14); // Slightly above platform
-    this.templeGroup.add(portalCircle);
-    
-    // Add glowing effect
-    const glowGeometry = new THREE.CircleGeometry(3.2, 32);
-    const glowMaterial = new THREE.MeshBasicMaterial({
+    // Create shimmering portal surface
+    const portalGeometry = new THREE.CircleGeometry(1.7, 32);
+    const portalMaterial = new THREE.MeshBasicMaterial({
       color: 0xffffaa,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.7,
       side: THREE.DoubleSide
     });
+    const portalSurface = new THREE.Mesh(portalGeometry, portalMaterial);
+    portalSurface.rotation.x = Math.PI / 2; // Make it stand upright
+    portalSurface.position.y = 2; // Same height as ring
+    portalGroup.add(portalSurface);
     
-    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-    glow.rotation.x = -Math.PI / 2;
-    glow.position.set(0, groundY + 0.52, 14);
-    this.templeGroup.add(glow);
+    // Add portal effect with another surface
+    const portalEffect = new THREE.Mesh(
+      new THREE.CircleGeometry(1.5, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+      })
+    );
+    portalEffect.rotation.x = Math.PI / 2;
+    portalEffect.position.y = 2;
+    portalGroup.add(portalEffect);
+    
+    // Create small decorative pillars at the base of the portal
+    this.createPortalPillars(portalGroup, marbleTexture, goldTexture);
     
     // Add point light in the center of the portal
-    const portalLight = new THREE.PointLight(0xffffaa, 1, 8);
-    portalLight.position.set(0, groundY + 1.5, 14);
-    this.templeGroup.add(portalLight);
+    const portalLight = new THREE.PointLight(0xffffaa, 1.5, 10);
+    portalLight.position.y = 2; // Center of portal
+    portalGroup.add(portalLight);
     
-    // Add small pedestals around the portal
+    // Position portal on the platform
+    portalGroup.position.set(0, platformY, 14);
+    this.templeGroup.add(portalGroup);
+    
+    // Store reference to portal object
+    this.portalObject = portalGroup;
+    
+    // Add collision for the portal base
+    this.collisionManager.addCollider({
+      position: new THREE.Vector3(this.templeGroup.position.x, platformY + 0.1, this.templeGroup.position.z + 14),
+      radius: 2.5,
+      type: 'cylinder',
+      height: 0.2
+    });
+    
+    return portalGroup;
+  }
+  
+  createPortalPillars(portalGroup, marbleTexture, goldTexture) {
+    // Create four small pillars around the portal base
+    const pillarCount = 4;
+    
+    for (let i = 0; i < pillarCount; i++) {
+      const angle = (i / pillarCount) * Math.PI * 2;
+      const radius = 2.2; // Slightly inside the base circle
+      
+      // Position calculations
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      
+      // Create mini-pillar
+      const pillarGroup = new THREE.Group();
+      
+      // Base of pillar
+      const pillarBaseGeometry = new THREE.CylinderGeometry(0.2, 0.25, 0.3, 16);
+      const marbleMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        map: marbleTexture,
+        roughness: 0.5,
+        metalness: 0.1
+      });
+      
+      const pillarBase = new THREE.Mesh(pillarBaseGeometry, marbleMaterial);
+      pillarBase.position.y = 0.15;
+      pillarGroup.add(pillarBase);
+      
+      // Shaft of pillar
+      const pillarShaftGeometry = new THREE.CylinderGeometry(0.15, 0.2, 1.2, 16);
+      const pillarShaft = new THREE.Mesh(pillarShaftGeometry, marbleMaterial);
+      pillarShaft.position.y = 0.9;
+      pillarGroup.add(pillarShaft);
+      
+      // Capital of pillar
+      const pillarCapitalGeometry = new THREE.CylinderGeometry(0.25, 0.15, 0.3, 16);
+      const pillarCapital = new THREE.Mesh(pillarCapitalGeometry, marbleMaterial);
+      pillarCapital.position.y = 1.65;
+      pillarGroup.add(pillarCapital);
+      
+      // Golden orb on top
+      const orbGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+      const goldMaterial = new THREE.MeshStandardMaterial({
+        color: 0xd4af37,
+        map: goldTexture,
+        roughness: 0.3,
+        metalness: 0.8,
+        emissive: 0xffaa00,
+        emissiveIntensity: 0.2
+      });
+      
+      const orb = new THREE.Mesh(orbGeometry, goldMaterial);
+      orb.position.y = 2.0;
+      pillarGroup.add(orb);
+      
+      // Position the pillar
+      pillarGroup.position.set(x, 0, z);
+      portalGroup.add(pillarGroup);
+    }
+  }
+  
+  createPortalPedestals(platformY, goldTexture, marbleTexture) {
+    // Add decorative pedestals around the platform
     const pedestalCount = 4;
     for (let i = 0; i < pedestalCount; i++) {
       const angle = (i / pedestalCount) * Math.PI * 2;
-      const radius = 4;
+      const radius = 8; // Position well outside the platform
       
       const x = Math.cos(angle) * radius;
       const z = 14 + Math.sin(angle) * radius;
@@ -793,9 +987,6 @@ class TemplesManager {
       pedestalLight.position.set(x, groundY + 2, z);
       this.templeGroup.add(pedestalLight);
     }
-    
-    // Add portal particles (will be animated)
-    this.createPortalParticles(groundY);
   }
   
   createPortalPedestal(marbleTexture, goldTexture) {
@@ -852,20 +1043,20 @@ class TemplesManager {
     return pedestalGroup;
   }
   
-  createPortalParticles(groundY) {
+  createPortalParticles(platformY) {
     // Create particle system for portal effect
     const particleCount = 500;
     const particlesGeometry = new THREE.BufferGeometry();
     const particlePositions = new Float32Array(particleCount * 3);
     
-    // Initialize particles in a circle
+    // Initialize particles in a torus shape around the portal
     for (let i = 0; i < particleCount; i++) {
       const i3 = i * 3;
       const angle = Math.random() * Math.PI * 2;
-      const radius = Math.random() * 3;
+      const radius = 1.8 + Math.random() * 0.4; // Around the portal ring
       
       particlePositions[i3] = Math.cos(angle) * radius;
-      particlePositions[i3 + 1] = Math.random() * 3; // Height
+      particlePositions[i3 + 1] = Math.random() * 4; // Height around the portal
       particlePositions[i3 + 2] = 14 + Math.sin(angle) * radius;
     }
     
@@ -880,7 +1071,7 @@ class TemplesManager {
     });
     
     const particles = new THREE.Points(particlesGeometry, particleMaterial);
-    particles.position.y = groundY + 0.5;
+    particles.position.y = platformY;
     
     // Add animation data
     particles.userData = {
@@ -892,12 +1083,12 @@ class TemplesManager {
           const initialX = particles.userData.initialPositions[i3];
           const initialZ = particles.userData.initialPositions[i3 + 2] - 14;
           
-          // Spiral upward
+          // Spiral around the portal
           const angle = Math.atan2(initialZ, initialX) + time * 0.001;
           const radius = Math.sqrt(initialX * initialX + initialZ * initialZ);
           
           positions[i3] = Math.cos(angle) * radius;
-          positions[i3 + 1] = (particles.userData.initialPositions[i3 + 1] + time * 0.001) % 3;
+          positions[i3 + 1] = (particles.userData.initialPositions[i3 + 1] + time * 0.001) % 4;
           positions[i3 + 2] = 14 + Math.sin(angle) * radius;
         }
         particles.geometry.attributes.position.needsUpdate = true;
@@ -950,6 +1141,9 @@ class TemplesManager {
       }
     }
     
+    // Animate portal
+    this.animatePortal(time);
+    
     // Animate portal particles if they exist
     if (this.templeGroup) {
       this.templeGroup.traverse((object) => {
@@ -958,6 +1152,22 @@ class TemplesManager {
         }
       });
     }
+  }
+  
+  // New method to animate the portal
+  animatePortal(time) {
+    if (!this.portalObject) return;
+    
+    // Find the portal surface to animate (the white inner circle)
+    this.portalObject.traverse((object) => {
+      if (object.isMesh && object.material && object.material.color && object.material.color.r > 0.9) {
+        // Pulse the opacity
+        object.material.opacity = 0.5 + 0.3 * Math.sin(time * 0.002);
+        
+        // Rotate slightly
+        object.rotation.z = time * 0.0005;
+      }
+    });
   }
   
   activatePortal() {
