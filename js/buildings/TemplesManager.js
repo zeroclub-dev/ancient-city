@@ -17,7 +17,8 @@ class TemplesManager {
     this.portalTrigger = null;
     this.portalObject = null;
   }
-  
+  let groundY = 0;
+
   async createTempleOfApollo() {
     this.templeGroup = new THREE.Group();
     
@@ -27,7 +28,7 @@ class TemplesManager {
     // Position temple near the plaza/agora
     const templeX = -40;
     const templeZ = 40;
-    const groundY = 0;
+    let groundY = 0;
     
     // Calculate ground height at the temple position
     const distFromCenter = Math.sqrt(templeX * templeX + templeZ * templeZ);
